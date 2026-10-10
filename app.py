@@ -40,7 +40,7 @@ GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
 ADMIN_ID = os.environ.get('ADMIN_ID', 'heena imitation jewellery')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'HeenaAdmin#2026')
-ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'tinaimitationjewelry065@gmail.com')
+ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'heenaimitationjewellery06@gmail.com')
 ADMIN_WHATSAPP_NUMBER = os.environ.get('ADMIN_WHATSAPP_NUMBER', '919777166165')
 WHATSAPP_API_URL = os.environ.get('WHATSAPP_API_URL', '')
 WHATSAPP_API_TOKEN = os.environ.get('WHATSAPP_API_TOKEN', '')
@@ -1545,7 +1545,7 @@ Address: {order.get('shipping_address')}
     subject = f"New Order Received — Heena Imitation Jewellery — Order #{order.get('order_code')}"
     msg = MIMEText(body)
     msg['Subject'] = subject
-    msg['From'] = f"Heena Orders <{smtp_user or 'tinaimitationjewelry065@gmail.com'}>"
+    msg['From'] = f"Heena Orders <{smtp_user or 'heenaimitationjewellery06@gmail.com'}>"
     msg['To'] = ADMIN_EMAIL
 
     sent_success = False
@@ -1828,7 +1828,7 @@ def get_order_invoice(order_code):
     gst_info = {
         'business_name': 'Heena Imitation Jewellery',
         'gstin': os.environ.get('BUSINESS_GSTIN', 'GST Document Pending Upload'),
-        'support_email': 'tinaimitationjewelry065@gmail.com',
+        'support_email': 'heenaimitationjewellery06@gmail.com',
         'support_phone': '+91 9777166165'
     }
 
