@@ -1,0 +1,21 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[build.environment]
+  PYTHON_VERSION = "3.11"
+
+[functions]
+  included_files = ["templates/**", "static/**", "database.db"]
+
+# 1. Serve static assets directly (CSS, JS, images, hero slider, uploads)
+[[redirects]]
+  from = "/static/*"
+  to = "/static/:splat"
+  status = 200
+
+# 2. Route all dynamic pages and API endpoints to the Flask serverless function
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/app"
+  status = 200
