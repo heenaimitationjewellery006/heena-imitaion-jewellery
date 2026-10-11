@@ -8,6 +8,7 @@
   SECRETS_SCAN_ENABLED = "false"
 
 [functions]
+  directory = "netlify/functions"
   included_files = ["templates/**", "static/**", "database.db"]
 
 # 1. Serve static assets directly (CSS, JS, images, hero slider, uploads)
