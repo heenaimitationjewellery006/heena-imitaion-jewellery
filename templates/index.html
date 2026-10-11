@@ -79,6 +79,14 @@
     </div>
   </header>
 
+  <!-- Mobile Dedicated Search Bar (< 768px) -->
+  <div class="mobile-search-bar-container">
+    <div class="search-input-wrapper mobile-search-wrapper">
+      <i class="fa-solid fa-magnifying-glass" style="color: var(--accent-gold);"></i>
+      <input type="text" class="search-input" id="mobileSearchInput" placeholder="Search necklaces, jhumkas, bridal sets..." onkeyup="handleLiveSearch(event)">
+    </div>
+  </div>
+
   <!-- ==================== CUSTOMER PAGE VIEWS ==================== -->
 
   <!-- PAGE 1: HOMEPAGE VIEW -->
@@ -586,6 +594,33 @@
       © 2026 Heena Imitation Jewellery. All Rights Reserved. All Prices Inclusive of GST.
     </div>
   </footer>
+
+  <!-- Fixed Mobile Bottom Navigation Bar (Modern E-Commerce Mobile App Experience) -->
+  <nav class="mobile-bottom-nav" id="mobileBottomNav">
+    <a href="javascript:void(0)" onclick="showPage('home-view')" class="mobile-nav-item active" id="mNavHome">
+      <i class="fa-solid fa-house"></i>
+      <span>Home</span>
+    </a>
+    <a href="javascript:void(0)" onclick="showPage('shop-view')" class="mobile-nav-item" id="mNavShop">
+      <i class="fa-solid fa-gem"></i>
+      <span>Shop</span>
+    </a>
+    <a href="javascript:void(0)" onclick="filterByCategory('Bridal Sets')" class="mobile-nav-item" id="mNavBridal">
+      <i class="fa-solid fa-crown"></i>
+      <span>Bridal</span>
+    </a>
+    <a href="javascript:void(0)" onclick="toggleCartDrawer()" class="mobile-nav-item" id="mNavCart">
+      <div class="mobile-nav-cart-wrapper">
+        <i class="fa-solid fa-bag-shopping"></i>
+        <span class="badge" id="mobileCartBadge">0</span>
+      </div>
+      <span>Bag</span>
+    </a>
+    <a href="javascript:void(0)" onclick="handleAuthClick()" class="mobile-nav-item" id="mNavAccount">
+      <i class="fa-regular fa-user"></i>
+      <span>Account</span>
+    </a>
+  </nav>
 
   <script src="/static/js/app.js"></script>
   <script>

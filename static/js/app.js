@@ -152,6 +152,13 @@ function showPage(pageId) {
   const activeNav = document.getElementById('nav-' + pageId.replace('-view', ''));
   if (activeNav) activeNav.classList.add('active');
 
+  document.querySelectorAll('.mobile-nav-item').forEach(el => el.classList.remove('active'));
+  const mNavId = pageId === 'home-view' ? 'mNavHome' : pageId === 'shop-view' ? 'mNavShop' : pageId === 'account-view' ? 'mNavAccount' : '';
+  if (mNavId) {
+    const mEl = document.getElementById(mNavId);
+    if (mEl) mEl.classList.add('active');
+  }
+
   if (pageId === 'home-view') initHeroCarousel();
   if (pageId === 'cart-view') renderFullCartPage();
   if (pageId === 'checkout-view') checkCheckoutAuth();
@@ -220,10 +227,12 @@ function updateBadges() {
   localStorage.setItem('hjm_wishlist', JSON.stringify(state.wishlist));
 
   const totalCartCount = state.cart.reduce((sum, item) => sum + item.qty, 0);
-  const cartBadge = document.getElementById('cartCount');
+  const cartBadge = document.getElementById('cartBadge') || document.getElementById('cartCount');
   if (cartBadge) cartBadge.textContent = totalCartCount;
+  const mobileCartBadge = document.getElementById('mobileCartBadge');
+  if (mobileCartBadge) mobileCartBadge.textContent = totalCartCount;
 
-  const wishlistBadge = document.getElementById('wishlistCount');
+  const wishlistBadge = document.getElementById('wishlistBadge') || document.getElementById('wishlistCount');
   if (wishlistBadge) wishlistBadge.textContent = state.wishlist.length;
 
   syncCartWithServer();
