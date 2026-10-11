@@ -39,8 +39,8 @@ app.secret_key = os.environ.get('SECRET_KEY', 'heena_imitation_jewellery_super_s
 # --- Secure Config ---
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
-ADMIN_ID = os.environ.get('ADMIN_ID', 'heena imitation jewellery')
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'HeenaAdmin#2026')
+ADMIN_ID = os.environ.get('ADMIN_ID', 'admin')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'heenaimitationjewellery06@gmail.com')
 ADMIN_WHATSAPP_NUMBER = os.environ.get('ADMIN_WHATSAPP_NUMBER', '919777166165')
 WHATSAPP_NUMBER = os.environ.get('WHATSAPP_NUMBER', '919777166165')
