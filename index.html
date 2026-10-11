@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Heena Imitation Jewellery | Trendy, Elegant & Affordable Imitation Jewellery</title>
+  <meta name="description" content="Shop luxury Kundan necklaces, bridal sets, antique gold earrings, bangles, rings, clutchers, scrunchies, and hair garters at Heena Imitation Jewellery. WhatsApp Helpline: 9777166165.">
+  <meta name="keywords" content="Heena Imitation Jewellery, Kundan necklace, bridal jewellery, Indian earrings, jhumkas, imitation gold jewellery online">
+  
+  <meta name="google-signin-client_id" content="232351341177-9gikhaq14jkfmelcnpo2t0hbu7nt1q83.apps.googleusercontent.com">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Announcement Top Bar -->
+  <div class="announcement-bar">
+    <span>✨ FESTIVE SALE: Flat 10% OFF with Code <strong>HEENA10</strong> | Free Delivery on Orders Above ₹500 (₹40 below ₹500) | WhatsApp: <strong>9777166165</strong> ✨</span>
+  </div>
+
+  <!-- Main Header & Navigation -->
+  <header class="header-wrapper">
+    <div class="container header-inner">
+      <!-- Brand Logo -->
+      <a href="#" onclick="showPage('home-view')" class="brand-logo" id="mainBrandLogo">
+        <img src="/static/images/logo.png" alt="Heena Imitation Jewellery Logo" class="brand-logo-img">
+        <div>
+          <div class="brand-logo-text">HEENA</div>
+          <div class="brand-subtitle">Imitation Jewellery</div>
+        </div>
+      </a>
+
+      <!-- Customer Navigation Links (Clean & Free of Admin Links) -->
+      <ul class="nav-links">
+        <li class="nav-item"><a href="#" onclick="showPage('home-view')" class="active" id="nav-home">Home</a></li>
+        <li class="nav-item"><a href="#" onclick="showPage('shop-view')" id="nav-shop">Shop All</a></li>
+        <li class="nav-item"><a href="#" onclick="filterByCategory('Bridal Sets')" id="nav-bridal">Bridal Spotlight</a></li>
+        <li class="nav-item"><a href="#" onclick="showPage('about-view')" id="nav-about">About Us</a></li>
+        <li class="nav-item"><a href="#" onclick="showPage('contact-view')" id="nav-contact">Contact Us</a></li>
+      </ul>
+
+      <!-- Header Actions -->
+      <div class="header-actions">
+        <!-- Live Search -->
+        <div class="search-container">
+          <div class="search-input-wrapper">
+            <i class="fa-solid fa-magnifying-glass" style="color: var(--text-muted);"></i>
+            <input type="text" class="search-input" id="searchInput" placeholder="Search necklaces, jhumkas..." onkeyup="handleLiveSearch(event)">
+          </div>
+          <div class="search-results-dropdown" id="searchResultsDropdown"></div>
+        </div>
+
+        <!-- Theme Toggle -->
+        <button class="action-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
+          <i class="fa-solid fa-moon" id="themeIcon"></i>
+        </button>
+
+        <!-- Wishlist -->
+        <button class="action-btn" onclick="showPage('account-view'); switchAccountTab('wishlist')" title="Wishlist">
+          <i class="fa-regular fa-heart"></i>
+          <span class="badge" id="wishlistCount">0</span>
+        </button>
+
+        <!-- Cart Drawer Trigger -->
+        <button class="action-btn" onclick="toggleCartDrawer()" title="Shopping Cart">
+          <i class="fa-solid fa-bag-shopping"></i>
+          <span class="badge" id="cartCount">0</span>
+        </button>
+
+        <!-- Customer Account / Email OTP Login Trigger -->
+        <button class="action-btn" onclick="openAuthModal()" title="Customer Account Login">
+          <i class="fa-regular fa-user"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== CUSTOMER PAGE VIEWS ==================== -->
+
+  <!-- PAGE 1: HOMEPAGE VIEW -->
+  <main id="home-view" class="page-view">
+    <!-- Hero Slider Carousel -->
+    <section class="hero-slider" id="heroSliderContainer">
+      <!-- Slide 1 -->
+      <div class="hero-slide active" data-slide="0">
+        <img src="{{ url_for('static', filename='images/hero/hero-1.jpg') }}" class="hero-bg-img" alt="Luxury Jewellery — Heena Imitation Jewellers" loading="eager">
+        <div class="container">
+          <div class="hero-content">
+            <div class="hero-logo-box">
+              <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Heena Logo" class="hero-overlay-logo">
+              <div class="hero-logo-badge">
+                <div class="hero-logo-brand-name">HEENA</div>
+                <div class="hero-logo-brand-sub">IMITATION JEWELLERY</div>
+              </div>
+            </div>
+            <span class="hero-tag">LUXURY COLLECTION</span>
+            <h1 class="hero-title">Elegance That Speaks</h1>
+            <p class="hero-subtitle">Discover jewellery designed to make every moment shine.</p>
+            <div class="hero-cta-wrapper">
+              <button class="btn-gold" onclick="showPage('shop-view')">SHOP COLLECTION <i class="fa-solid fa-arrow-right"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 2 -->
+      <div class="hero-slide" data-slide="1">
+        <img src="{{ url_for('static', filename='images/hero/hero-2.jpg') }}" class="hero-bg-img" alt="Bridal Collection — Heena Imitation Jewellers" loading="lazy">
+        <div class="container">
+          <div class="hero-content">
+            <div class="hero-logo-box">
+              <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Heena Logo" class="hero-overlay-logo">
+              <div class="hero-logo-badge">
+                <div class="hero-logo-brand-name">HEENA</div>
+                <div class="hero-logo-brand-sub">IMITATION JEWELLERY</div>
+              </div>
+            </div>
+            <span class="hero-tag">BRIDAL COLLECTION</span>
+            <h1 class="hero-title">Made for Your Special Moments</h1>
+            <p class="hero-subtitle">Timeless bridal-inspired jewellery with a modern touch.</p>
+            <div class="hero-cta-wrapper">
+              <button class="btn-gold" onclick="filterByCategory('Bridal Sets')">EXPLORE BRIDAL <i class="fa-solid fa-crown"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 3 -->
+      <div class="hero-slide" data-slide="2">
+        <img src="{{ url_for('static', filename='images/hero/hero-3.jpg') }}" class="hero-bg-img" alt="New Arrivals — Heena Imitation Jewellers" loading="lazy">
+        <div class="container">
+          <div class="hero-content">
+            <div class="hero-logo-box">
+              <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Heena Logo" class="hero-overlay-logo">
+              <div class="hero-logo-badge">
+                <div class="hero-logo-brand-name">HEENA</div>
+                <div class="hero-logo-brand-sub">IMITATION JEWELLERY</div>
+              </div>
+            </div>
+            <span class="hero-tag">NEW ARRIVALS</span>
+            <h1 class="hero-title">Meet The New Collection</h1>
+            <p class="hero-subtitle">Fresh designs. Refined details. Effortless elegance.</p>
+            <div class="hero-cta-wrapper">
+              <button class="btn-gold" onclick="loadFeaturedProducts('newarrivals'); showPage('home-view');">SHOP NEW ARRIVALS <i class="fa-solid fa-sparkles"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 4 -->
+      <div class="hero-slide" data-slide="3">
+        <img src="{{ url_for('static', filename='images/hero/hero-4.jpg') }}" class="hero-bg-img" alt="Festive Collection — Heena Imitation Jewellers" loading="lazy">
+        <div class="container">
+          <div class="hero-content">
+            <div class="hero-logo-box">
+              <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Heena Logo" class="hero-overlay-logo">
+              <div class="hero-logo-badge">
+                <div class="hero-logo-brand-name">HEENA</div>
+                <div class="hero-logo-brand-sub">IMITATION JEWELLERY</div>
+              </div>
+            </div>
+            <span class="hero-tag">FESTIVE COLLECTION</span>
+            <h1 class="hero-title">Celebrate in Style</h1>
+            <p class="hero-subtitle">Add a little sparkle to every celebration.</p>
+            <div class="hero-cta-wrapper">
+              <button class="btn-gold" onclick="showPage('shop-view')">SHOP FESTIVE <i class="fa-solid fa-gem"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 5 -->
+      <div class="hero-slide" data-slide="4">
+        <img src="{{ url_for('static', filename='images/hero/hero-5.jpg') }}" class="hero-bg-img" alt="Everyday Elegance — Heena Imitation Jewellers" loading="lazy">
+        <div class="container">
+          <div class="hero-content">
+            <div class="hero-logo-box">
+              <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Heena Logo" class="hero-overlay-logo">
+              <div class="hero-logo-badge">
+                <div class="hero-logo-brand-name">HEENA</div>
+                <div class="hero-logo-brand-sub">IMITATION JEWELLERY</div>
+              </div>
+            </div>
+            <span class="hero-tag">EVERYDAY ELEGANCE</span>
+            <h1 class="hero-title">Jewellery for Every Day</h1>
+            <p class="hero-subtitle">Beautiful designs made to become part of your everyday style.</p>
+            <div class="hero-cta-wrapper">
+              <button class="btn-gold" onclick="showPage('shop-view')">EXPLORE COLLECTION <i class="fa-solid fa-arrow-right"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation Arrows -->
+      <button class="hero-arrow hero-prev" onclick="moveHeroSlide(-1)" aria-label="Previous Slide"><i class="fa-solid fa-chevron-left"></i></button>
+      <button class="hero-arrow hero-next" onclick="moveHeroSlide(1)" aria-label="Next Slide"><i class="fa-solid fa-chevron-right"></i></button>
+
+      <!-- Dot Indicators -->
+      <div class="hero-dots" id="heroDotsContainer">
+        <div class="hero-dot active" onclick="goToHeroSlide(0)" role="button" aria-label="Slide 1"></div>
+        <div class="hero-dot" onclick="goToHeroSlide(1)" role="button" aria-label="Slide 2"></div>
+        <div class="hero-dot" onclick="goToHeroSlide(2)" role="button" aria-label="Slide 3"></div>
+        <div class="hero-dot" onclick="goToHeroSlide(3)" role="button" aria-label="Slide 4"></div>
+        <div class="hero-dot" onclick="goToHeroSlide(4)" role="button" aria-label="Slide 5"></div>
+      </div>
+    </section>
+
+    <!-- Categories Grid -->
+    <section class="section-padding container">
+      <div class="section-title-wrapper">
+        <span class="section-sub">EXPLORE BY CATEGORY</span>
+        <h2 class="section-main-title">Handcrafted Treasures</h2>
+      </div>
+      <div class="category-grid" id="categoryGridContainer"></div>
+    </section>
+
+    <!-- Bridal Spotlight -->
+    <section class="container">
+      <div class="bridal-spotlight">
+        <div class="bridal-flex">
+          <div class="bridal-text">
+            <span class="bridal-badge">BRIDAL LUXURY SPOTLIGHT</span>
+            <h2 class="bridal-title">The Maharani Kundan Collection</h2>
+            <p class="bridal-desc">Regal 24k antique gold plated choker sets, long haars, chandbalis, and maang tikkas designed to make your special day unforgettable.</p>
+            <button class="btn-gold" onclick="filterByCategory('Bridal Sets')">Shop Bridal Sets <i class="fa-solid fa-gem"></i></button>
+          </div>
+          <div class="bridal-img-wrapper">
+            <img src="/static/images/bridal_spotlight.jpg" alt="Maharani Bridal Kundan Set">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Best-Sellers & New Arrivals Section -->
+    <section class="section-padding container">
+      <div class="section-title-wrapper">
+        <span class="section-sub">CURATED FOR YOU</span>
+        <h2 class="section-main-title">Best Sellers & New Arrivals</h2>
+        <div style="display: flex; justify-content: center; gap: 14px; margin-top: 18px;">
+          <button class="btn-gold btn-outline-gold" id="btn-tab-bestsellers" onclick="loadFeaturedProducts('bestsellers')">Best Sellers</button>
+          <button class="btn-gold btn-outline-gold" id="btn-tab-newarrivals" onclick="loadFeaturedProducts('newarrivals')">New Arrivals</button>
+        </div>
+      </div>
+      <div class="products-grid" id="featuredProductsContainer"></div>
+    </section>
+
+    <!-- Customer Testimonials -->
+    <section class="section-padding container">
+      <div class="section-title-wrapper">
+        <span class="section-sub">WHAT OUR CUSTOMERS SAY</span>
+        <h2 class="section-main-title">Loved by 50,000+ Women Across India</h2>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
+        <div style="background-color: var(--bg-card); padding: 24px; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--card-shadow);">
+          <div style="color: #F1C40F; margin-bottom: 10px;"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i></div>
+          <p style="color: var(--text-muted); font-style: italic; margin-bottom: 16px;">"Ordered the Kundan bridal set. Looks completely like real 22k gold! Quick delivery."</p>
+          <div style="font-weight: 700;">- Pooja Patel <span style="font-size: 0.8rem; color: #27AE60; font-weight: 500;"><i class="fa-solid fa-circle-check"></i> Verified Buyer</span></div>
+        </div>
+        <div style="background-color: var(--bg-card); padding: 24px; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--card-shadow);">
+          <div style="color: #F1C40F; margin-bottom: 10px;"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i></div>
+          <p style="color: var(--text-muted); font-style: italic; margin-bottom: 16px;">"The website is so smooth and easy to use! Beautiful packaging with velvet box included."</p>
+          <div style="font-weight: 700;">- Ananya Sharma <span style="font-size: 0.8rem; color: #27AE60; font-weight: 500;"><i class="fa-solid fa-circle-check"></i> Verified Buyer</span></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- PAGE 2: SHOP VIEW -->
+  <main id="shop-view" class="page-view container section-padding" style="display: none;">
+    <div class="shop-header-bar">
+      <div>
+        <h1 class="serif-font" style="font-size: 1.8rem;" id="shopCategoryTitle">All Imitation Jewellery</h1>
+        <p style="color: var(--text-muted); font-size: 0.9rem;" id="shopProductsCount">Showing products...</p>
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <label style="font-size: 0.9rem; font-weight: 600;">Sort By:</label>
+        <select class="sort-select" id="sortSelect" onchange="fetchFilteredProducts()">
+          <option value="popularity">Popularity</option>
+          <option value="price-low">Price: Low to High</option>
+          <option value="price-high">Price: High to Low</option>
+          <option value="newest">Newest Arrivals</option>
+          <option value="rating">Highest Rated</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="shop-layout">
+      <!-- Filter Sidebar -->
+      <aside class="filter-sidebar">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+          <h3 style="font-size: 1.1rem; color: var(--brand-maroon);"><i class="fa-solid fa-sliders"></i> Filters</h3>
+          <button style="font-size: 0.85rem; color: var(--accent-gold); font-weight: 600;" onclick="resetFilters()">Reset All</button>
+        </div>
+
+        <div class="filter-group">
+          <div class="filter-title">Category</div>
+          <div class="filter-options">
+            <label class="checkbox-label"><input type="radio" name="filterCategory" value="all" checked onchange="fetchFilteredProducts()"> All Categories</label>
+            <label class="checkbox-label"><input type="radio" name="filterCategory" value="Necklaces" onchange="fetchFilteredProducts()"> Necklaces</label>
+            <label class="checkbox-label"><input type="radio" name="filterCategory" value="Earrings" onchange="fetchFilteredProducts()"> Earrings</label>
+            <label class="checkbox-label"><input type="radio" name="filterCategory" value="Pendants" onchange="fetchFilteredProducts()"> Pendants</label>
+            <label class="checkbox-label"><input type="radio" name="filterCategory" value="Bracelets" onchange="fetchFilteredProducts()"> Bracelets & Bangles</label>
+            <label class="checkbox-label"><input type="radio" name="filterCategory" value="Rings" onchange="fetchFilteredProducts()"> Rings</label>
+            <label class="checkbox-label"><input type="radio" name="filterCategory" value="Bridal Sets" onchange="fetchFilteredProducts()"> Bridal Sets</label>
+            <label class="checkbox-label"><input type="radio" name="filterCategory" value="Clutchers" onchange="fetchFilteredProducts()"> Hair Clutchers</label>
+            <label class="checkbox-label"><input type="radio" name="filterCategory" value="Scrunchies & Garters" onchange="fetchFilteredProducts()"> Scrunchies & Garters</label>
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <div class="filter-title">Price Range</div>
+          <input type="range" class="price-range-slider" id="priceRange" min="200" max="6000" step="100" value="6000" oninput="updatePriceSlider(this.value)" onchange="fetchFilteredProducts()">
+          <div class="price-val-display">
+            <span>₹200</span>
+            <span id="priceMaxLabel">Up to ₹6,000</span>
+          </div>
+        </div>
+      </aside>
+
+      <section>
+        <div class="products-grid" id="shopProductsGrid"></div>
+      </section>
+    </div>
+  </main>
+
+  <!-- PAGE 3: PDP VIEW -->
+  <main id="pdp-view" class="page-view container section-padding" style="display: none;">
+    <button class="btn-gold btn-outline-gold" onclick="showPage('shop-view')" style="margin-bottom: 24px;"><i class="fa-solid fa-arrow-left"></i> Back to Shop</button>
+    <div id="pdpContentContainer"></div>
+  </main>
+
+  <!-- PAGE 4: FULL CART VIEW -->
+  <main id="cart-view" class="page-view container section-padding" style="display: none;">
+    <h1 class="serif-font" style="font-size: 2.2rem; margin-bottom: 24px;">Your Shopping Bag</h1>
+    <div id="fullCartContainer"></div>
+  </main>
+
+  <!-- PAGE 5: CHECKOUT FLOW VIEW -->
+  <main id="checkout-view" class="page-view container section-padding" style="display: none;">
+    <h1 class="serif-font" style="font-size: 2.2rem; margin-bottom: 24px;">Checkout</h1>
+    <div style="display: grid; grid-template-columns: 1fr 380px; gap: 40px;" id="checkoutGrid">
+      <div style="background-color: var(--bg-card); padding: 32px; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--card-shadow);">
+        <h3 style="font-size: 1.3rem; margin-bottom: 20px; color: var(--brand-maroon);"><i class="fa-solid fa-truck"></i> Shipping Address</h3>
+        <form id="checkoutForm" onsubmit="handleProceedToPayment(event)">
+          <div style="margin-bottom: 16px;">
+            <label style="font-size: 0.85rem; font-weight: 600;">Full Name *</label>
+            <input type="text" id="chkName" required placeholder="Ananya Sharma" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-top: 6px;">
+          </div>
+          <div style="margin-bottom: 16px;">
+            <label style="font-size: 0.85rem; font-weight: 600;">Verified Account Email *</label>
+            <input type="email" id="chkEmail" required readonly placeholder="ananya@example.com" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-top: 6px; background-color: var(--bg-secondary);">
+          </div>
+          <div style="margin-bottom: 16px;">
+            <label style="font-size: 0.85rem; font-weight: 600;">Phone Number (for Order Updates & Delivery) *</label>
+            <input type="tel" id="chkPhone" required placeholder="+91 9777166165" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-top: 6px;">
+          </div>
+          <div style="margin-bottom: 16px;">
+            <label style="font-size: 0.85rem; font-weight: 600;">Street Address / Flat / Landmark *</label>
+            <input type="text" id="chkAddress" required placeholder="Flat 402, Golden Heights, M.G. Road" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-top: 6px;">
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+            <div>
+              <label style="font-size: 0.85rem; font-weight: 600;">City *</label>
+              <input type="text" id="chkCity" required placeholder="Mumbai" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-top: 6px;">
+            </div>
+            <div>
+              <label style="font-size: 0.85rem; font-weight: 600;">State *</label>
+              <input type="text" id="chkState" required placeholder="Maharashtra" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-top: 6px;">
+            </div>
+            <div>
+              <label style="font-size: 0.85rem; font-weight: 600;">Pincode *</label>
+              <input type="text" id="chkPincode" required placeholder="400001" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-top: 6px;">
+            </div>
+          </div>
+          <button type="submit" class="btn-gold" style="width: 100%;">Proceed to Payment (UPI / Cards / COD) <i class="fa-solid fa-lock"></i></button>
+        </form>
+      </div>
+
+      <div style="background-color: var(--bg-card); padding: 24px; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--card-shadow); height: fit-content;">
+        <h3 style="font-size: 1.2rem; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">Order Summary</h3>
+        <div id="checkoutSummaryItems"></div>
+        <div id="checkoutSummaryTotals" style="margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 16px;"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- PAGE 6: ORDER SUCCESS VIEW -->
+  <main id="order-success-view" class="page-view container section-padding" style="display: none; text-align: center;">
+    <div id="orderSuccessContainer" style="max-width: 650px; margin: 0 auto; background-color: var(--bg-card); padding: 40px; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--card-shadow);"></div>
+  </main>
+
+  <!-- PAGE 7: CUSTOMER ACCOUNT PORTAL -->
+  <main id="account-view" class="page-view container section-padding" style="display: none;">
+    <div style="display: flex; gap: 30px;">
+      <div style="width: 240px; background-color: var(--bg-card); padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+        <h3 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--brand-maroon);" id="accWelcomeName">My Account</h3>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <button class="btn-gold btn-outline-gold" onclick="switchAccountTab('orders')" style="justify-content: flex-start;"><i class="fa-solid fa-box"></i> Order History</button>
+          <button class="btn-gold btn-outline-gold" onclick="switchAccountTab('wishlist')" style="justify-content: flex-start;"><i class="fa-solid fa-heart"></i> Saved Wishlist</button>
+          <button class="btn-gold btn-maroon" onclick="handleCustomerLogout()" style="justify-content: flex-start; margin-top: 16px;"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+        </div>
+      </div>
+      <div style="flex-grow: 1; background-color: var(--bg-card); padding: 28px; border-radius: var(--radius-md); border: 1px solid var(--border-color);" id="accountTabContent"></div>
+    </div>
+  </main>
+
+  <!-- INSTITUTIONAL PAGES -->
+  <main id="about-view" class="page-view container section-padding" style="display: none;">
+    <div style="max-width: 800px; margin: 0 auto; background-color: var(--bg-card); padding: 40px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+      <h1 class="serif-font" style="font-size: 2.4rem; color: var(--brand-maroon); margin-bottom: 16px;">About Heena Imitation Jewellery</h1>
+      <p style="font-size: 1.1rem; line-height: 1.8; margin-bottom: 20px;">Founded with a vision to make high-end traditional Indian jewellery accessible to every woman, <strong>Heena Imitation Jewellery</strong> crafts exquisite Kundan, Temple, and Zircon jewellery that reflects regal heritage and modern aesthetics.</p>
+    </div>
+  </main>
+
+  <main id="contact-view" class="page-view container section-padding" style="display: none;">
+    <h1 class="serif-font" style="font-size: 2.2rem; margin-bottom: 24px;">Contact Us</h1>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
+      <div style="background-color: var(--bg-card); padding: 32px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+        <h3 style="font-size: 1.3rem; margin-bottom: 16px; color: var(--brand-maroon);">Send Us a Message</h3>
+        <form onsubmit="event.preventDefault(); showToast('Inquiry sent successfully!');">
+          <div style="margin-bottom: 14px;">
+            <label style="font-size: 0.85rem; font-weight: 600;">Your Name</label>
+            <input type="text" required placeholder="Ananya Sharma" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-top: 4px;">
+          </div>
+          <div style="margin-bottom: 14px;">
+            <label style="font-size: 0.85rem; font-weight: 600;">Email Address</label>
+            <input type="email" required placeholder="ananya@example.com" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-top: 4px;">
+          </div>
+          <div style="margin-bottom: 14px;">
+            <label style="font-size: 0.85rem; font-weight: 600;">Message</label>
+            <textarea rows="4" required placeholder="Inquire about bridal customization..." style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-top: 4px;"></textarea>
+          </div>
+          <button type="submit" class="btn-gold">Send Inquiry <i class="fa-solid fa-paper-plane"></i></button>
+        </form>
+      </div>
+
+      <div style="background-color: var(--bg-card); padding: 32px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+        <h3 style="font-size: 1.3rem; margin-bottom: 16px; color: var(--brand-maroon);"><i class="fa-solid fa-store"></i> Customer WhatsApp Support</h3>
+        <p style="margin-bottom: 10px;"><strong>Heena Imitation Jewellery</strong></p>
+        <p style="color: var(--text-muted); margin-bottom: 12px;"><i class="fa-brands fa-whatsapp" style="color: #25D366; font-size: 1.2rem;"></i> WhatsApp Support: <strong>9777166165</strong></p>
+        
+        <a href="https://wa.me/919777166165?text=Hello%20Heena%20Imitation%20Jewellery!%20I%20have%20an%20inquiry." target="_blank" class="btn-gold" style="background-color: #25D366; color: white; margin-top: 14px; width: 100%;">
+          Chat Directly on WhatsApp <i class="fa-brands fa-whatsapp"></i>
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <!-- ==================== MODALS & DRAWERS ==================== -->
+
+  <!-- Slide-Out Shopping Cart Drawer -->
+  <div class="cart-drawer" id="cartDrawer">
+    <div class="cart-drawer-header">
+      <h3 style="font-size: 1.2rem; font-family: var(--font-heading); color: var(--brand-maroon);"><i class="fa-solid fa-bag-shopping"></i> Shopping Bag</h3>
+      <button class="close-modal-btn" onclick="toggleCartDrawer()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="cart-drawer-body" id="cartDrawerBody"></div>
+    <div class="cart-drawer-footer" id="cartDrawerFooter"></div>
+  </div>
+
+  <!-- PDP Quick View Modal -->
+  <div class="modal-backdrop" id="quickViewModal">
+    <div class="modal-content">
+      <button class="close-modal-btn" onclick="closeModal('quickViewModal')"><i class="fa-solid fa-xmark"></i></button>
+      <div id="quickViewContent"></div>
+    </div>
+  </div>
+
+  <!-- CUSTOMER AUTHENTICATION MODAL (GOOGLE SIGN-IN & EMAIL + PASSWORD) -->
+  <div class="modal-backdrop" id="authModal">
+    <div class="modal-content" style="max-width: 440px;">
+      <button class="close-modal-btn" onclick="closeModal('authModal')"><i class="fa-solid fa-xmark"></i></button>
+      <div id="authModalContent"></div>
+    </div>
+  </div>
+
+  <!-- PAYMENT & DIRECT UPI MODAL -->
+  <div class="modal-backdrop" id="razorpayModal">
+    <div class="razorpay-card">
+      <div class="razorpay-header">
+        <div>
+          <div style="font-weight: 700; font-size: 1.1rem; letter-spacing: 0.03em;">HEENA SECURE PAYMENT</div>
+          <div style="font-size: 0.75rem; color: #94A3B8;">Heena Imitation Jewellery</div>
+        </div>
+        <div style="font-size: 1.2rem; font-weight: 700; color: #3399FF;" id="rzpTotalAmount">₹0</div>
+      </div>
+
+      <p style="font-size: 0.85rem; color: #64748B; margin-bottom: 12px;">Select Payment Method:</p>
+      
+      <div class="payment-method-grid">
+        <div class="payment-option-card selected" id="opt-upi" onclick="selectPayOption('upi')">
+          <i class="fa-solid fa-qrcode" style="font-size: 1.4rem; color: #3399FF; margin-bottom: 6px;"></i>
+          <div style="font-size: 0.85rem; font-weight: 600;">Direct UPI / QR Code</div>
+        </div>
+        <div class="payment-option-card" id="opt-card" onclick="selectPayOption('card')">
+          <i class="fa-regular fa-credit-card" style="font-size: 1.4rem; color: #3399FF; margin-bottom: 6px;"></i>
+          <div style="font-size: 0.85rem; font-weight: 600;">Credit / Debit Card</div>
+        </div>
+        <div class="payment-option-card" id="opt-netbank" onclick="selectPayOption('netbank')">
+          <i class="fa-solid fa-building-columns" style="font-size: 1.4rem; color: #3399FF; margin-bottom: 6px;"></i>
+          <div style="font-size: 0.85rem; font-weight: 600;">Net Banking</div>
+        </div>
+        <div class="payment-option-card" id="opt-cod" onclick="selectPayOption('cod')">
+          <i class="fa-solid fa-hand-holding-dollar" style="font-size: 1.4rem; color: #3399FF; margin-bottom: 6px;"></i>
+          <div style="font-size: 0.85rem; font-weight: 600;">Cash On Delivery</div>
+        </div>
+      </div>
+
+      <div id="directUpiContainer" style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: var(--radius-sm); padding: 16px; margin-bottom: 16px; text-align: center;">
+        <div style="font-size: 0.85rem; font-weight: 700; color: #1E293B; margin-bottom: 8px;">Scan UPI QR Code to Pay:</div>
+        <img id="upiQrCodeImg" src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=9777166165@ybl%26pn=Heena%20Imitation%20Jewellery%26cu=INR" alt="UPI QR Code" style="width: 160px; height: 160px; margin: 0 auto 10px auto; border-radius: 8px; border: 1px solid #CBD5E1;">
+        <div style="font-size: 0.8rem; color: #475569; margin-bottom: 10px;">UPI ID: <strong>9777166165@ybl</strong></div>
+      </div>
+
+      <button class="btn-gold" style="width: 100%; background-color: #3399FF; font-size: 1rem; border-radius: var(--radius-sm);" onclick="executeRazorpayPayment()">
+        Complete Payment & Place Order <i class="fa-solid fa-shield-halved"></i>
+      </button>
+      <button style="width: 100%; margin-top: 10px; font-size: 0.85rem; color: #64748B;" onclick="closeModal('razorpayModal')">Cancel Payment</button>
+    </div>
+  </div>
+
+  <!-- POLICY MODAL (Mandatory for Razorpay Live Compliance) -->
+  <div class="modal-backdrop" id="policyModal">
+    <div style="background: #ffffff; border-radius: 12px; max-width: 650px; width: 92%; max-height: 85vh; overflow-y: auto; padding: 28px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); position: relative; border: 1px solid var(--accent-gold);">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-color); padding-bottom: 12px; margin-bottom: 18px;">
+        <h3 id="policyModalTitle" style="color: var(--brand-maroon); font-family: var(--font-heading); font-size: 1.4rem; margin: 0;">Policy</h3>
+        <button onclick="closeModal('policyModal')" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #888;">&times;</button>
+      </div>
+      <div id="policyModalBody" style="font-size: 0.95rem; line-height: 1.7; color: #333;">
+        <!-- Populated dynamically via openPolicyModal(type) -->
+      </div>
+      <div style="text-align: right; margin-top: 24px; border-top: 1px solid #eee; padding-top: 14px;">
+        <button class="btn-gold" onclick="closeModal('policyModal')" style="padding: 8px 24px;">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating WhatsApp Widget -->
+  <a href="https://wa.me/919777166165?text=Hello%20Heena%20Imitation%20Jewellery,%20I%20have%20an%20inquiry." target="_blank" class="floating-whatsapp" title="Chat on WhatsApp (9777166165)">
+    <i class="fa-brands fa-whatsapp"></i>
+  </a>
+
+  <button class="sticky-pulse-shop" onclick="showPage('shop-view')">
+    <i class="fa-solid fa-gem"></i> Shop Now
+  </button>
+
+  <!-- Footer -->
+  <footer style="background-color: var(--brand-maroon); color: #FFF8F0; padding: 60px 0 24px 0; margin-top: 80px;">
+    <div class="container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 32px; margin-bottom: 40px;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+          <img src="/static/images/logo.png" alt="Heena Logo" style="height: 52px; width: 52px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-gold); background: #FFF; padding: 2px;">
+          <div style="font-family: var(--font-heading); font-size: 1.8rem; font-weight: 700; color: var(--accent-gold);">HEENA</div>
+        </div>
+        <p style="font-size: 0.9rem; color: #E8D5C8; line-height: 1.6;">Heena Imitation Jewellery - Premier online boutique for trendy, elegant, and affordable handcrafted imitation jewellery across India.</p>
+      </div>
+      <div>
+        <h4 style="font-size: 1.1rem; color: var(--accent-gold); margin-bottom: 16px;">Quick Links</h4>
+        <ul style="list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 0.9rem;">
+          <li><a href="#" onclick="showPage('shop-view')" style="color: #E8D5C8; text-decoration: none;">Shop All Jewellery</a></li>
+          <li><a href="#" onclick="filterByCategory('Bridal Sets')" style="color: #E8D5C8; text-decoration: none;">Bridal Sets Spotlight</a></li>
+          <li><a href="#" onclick="showPage('about-view')" style="color: #E8D5C8; text-decoration: none;">About Our Brand</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 style="font-size: 1.1rem; color: var(--accent-gold); margin-bottom: 16px;">Policies & Legal</h4>
+        <ul style="list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 0.9rem;">
+          <li><a href="javascript:void(0)" onclick="openPolicyModal('shipping')" style="color: #E8D5C8; text-decoration: none;">Shipping & Delivery</a></li>
+          <li><a href="javascript:void(0)" onclick="openPolicyModal('refund')" style="color: #E8D5C8; text-decoration: none;">Returns & Refund Policy</a></li>
+          <li><a href="javascript:void(0)" onclick="openPolicyModal('terms')" style="color: #E8D5C8; text-decoration: none;">Terms & Conditions</a></li>
+          <li><a href="javascript:void(0)" onclick="openPolicyModal('privacy')" style="color: #E8D5C8; text-decoration: none;">Privacy Policy</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 style="font-size: 1.1rem; color: var(--accent-gold); margin-bottom: 16px;">Customer Support</h4>
+        <p style="font-size: 0.9rem; color: #E8D5C8; margin-bottom: 8px;"><i class="fa-solid fa-envelope" style="color: var(--accent-gold);"></i> Email: <strong>heenaimitationjewellery06@gmail.com</strong></p>
+        <p style="font-size: 0.9rem; color: #E8D5C8;"><i class="fa-brands fa-whatsapp" style="color: #25D366;"></i> WhatsApp: <strong>9777166165</strong></p>
+        <p style="font-size: 0.85rem; color: #D6C2B4; margin-top: 8px;"><i class="fa-solid fa-location-dot" style="color: var(--accent-gold);"></i> Gujarat, India</p>
+      </div>
+    </div>
+    <div style="border-top: 1px solid rgba(255,255,255,0.15); padding-top: 20px; text-align: center; font-size: 0.85rem; color: #D6C2B4;">
+      © 2026 Heena Imitation Jewellery. All Rights Reserved. All Prices Inclusive of GST.
+    </div>
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+  <script>
+    if (typeof initHeroCarousel === 'function') {
+      initHeroCarousel();
+    }
+  </script>
+</body>
+</html>

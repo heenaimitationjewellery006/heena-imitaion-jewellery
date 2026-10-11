@@ -15,8 +15,8 @@
   to = "/static/:splat"
   status = 200
 
-# 2. Route all dynamic pages and API endpoints to the Flask serverless function
+# 2. Route all requests to index.html
 [[redirects]]
   from = "/*"
-  to = "/.netlify/functions/app"
+  to = "/index.html"
   status = 200
