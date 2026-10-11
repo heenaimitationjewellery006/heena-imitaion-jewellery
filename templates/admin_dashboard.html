@@ -135,7 +135,7 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
       <div>
         <h1 style="font-family: serif; font-size: 2.2rem; color: #FFFFFF; margin: 0;">Store Inventory & Orders Control</h1>
-        <p style="color: #A1A1AA; margin-top: 4px;">Connected to Laragon MySQL Database <code>heena imitation jewellery</code></p>
+        <p style="color: #A1A1AA; margin-top: 4px;">Connected to Database: <strong>Supabase Cloud / PostgreSQL</strong></p>
       </div>
       <button class="btn-gold" onclick="openUploadProductModal()"><i class="fa-solid fa-cloud-arrow-up"></i> Upload Product & Side Profile</button>
     </div>
@@ -148,7 +148,7 @@
       <button class="btn-gold btn-outline-gold" id="tab-admin-stock" onclick="switchAdminTab('stock')"><i class="fa-solid fa-boxes-stacked"></i> STOCK DETAILS & INVENTORY</button>
       <button class="btn-gold btn-outline-gold" id="tab-admin-orders" onclick="switchAdminTab('orders')"><i class="fa-solid fa-cart-flatbed"></i> CUSTOMER ORDER DETAILS</button>
       <button class="btn-gold btn-outline-gold" id="tab-admin-upload" onclick="switchAdminTab('upload')"><i class="fa-solid fa-tags"></i> UPLOAD & PRICE LISTING</button>
-      <button class="btn-gold btn-outline-gold" id="tab-admin-db" onclick="switchAdminTab('db')"><i class="fa-solid fa-database"></i> LARAGON MYSQL DB INSPECTOR</button>
+      <button class="btn-gold btn-outline-gold" id="tab-admin-db" onclick="switchAdminTab('db')"><i class="fa-solid fa-database"></i> DATABASE INSPECTOR</button>
     </div>
 
     <div id="adminTabContent"></div>
@@ -159,7 +159,7 @@
     <div class="modal-content">
       <button class="close-modal-btn" onclick="closeModal('uploadProductModal')"><i class="fa-solid fa-xmark"></i></button>
       <h2 style="font-family: serif; color: #C9A15C; margin-bottom: 6px;"><i class="fa-solid fa-cloud-arrow-up"></i> Upload Product & Price Listing</h2>
-      <p style="font-size: 0.85rem; color: #A1A1AA; margin-bottom: 20px;">Add front image, side profile image, stock count, and price details to Laragon MySQL database.</p>
+      <p style="font-size: 0.85rem; color: #A1A1AA; margin-bottom: 20px;">Add front image, side profile image, stock count, and price details to database catalog.</p>
 
       <form onsubmit="handleUploadProductFormSubmit(event)">
         <div style="margin-bottom: 14px;">
@@ -227,7 +227,7 @@
           <textarea id="upDescription" rows="3" placeholder="Exquisite Kundan craftsmanship..." style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #383840; background-color: #161618; color: white; margin-top: 4px; box-sizing: border-box;"></textarea>
         </div>
 
-        <button type="submit" class="btn-gold" style="width: 100%; justify-content: center; padding: 12px;">Save Product to Laragon MySQL Database <i class="fa-solid fa-check"></i></button>
+        <button type="submit" class="btn-gold" style="width: 100%; justify-content: center; padding: 12px;">Save Product to Database Catalog <i class="fa-solid fa-check"></i></button>
       </form>
     </div>
   </div>
@@ -446,7 +446,7 @@
           <div style="background: #1E1E24; border: 1px solid #383840; border-radius: 12px; padding: 36px; max-width: 600px; margin: 0 auto; text-align: center;">
             <i class="fa-solid fa-cloud-arrow-up" style="font-size: 3.5rem; color: #C9A15C; margin-bottom: 16px;"></i>
             <h3 style="font-family: serif; font-size: 1.6rem; color: #FFFFFF; margin-bottom: 8px;">Upload Product & Side Profile</h3>
-            <p style="color: #A1A1AA; margin-bottom: 24px;">Upload main product images, side profiles, stock counts, and price listings directly to Laragon MySQL.</p>
+            <p style="color: #A1A1AA; margin-bottom: 24px;">Upload main product images, side profiles, stock counts, and price listings directly to database.</p>
             <button class="btn-gold" onclick="openUploadProductModal()" style="font-size: 1rem; padding: 14px 28px;"><i class="fa-solid fa-plus-circle"></i> Open Product Upload Manager</button>
           </div>
         `;
@@ -459,7 +459,7 @@
               <div style="background: #1E1E24; border: 1px solid #383840; border-radius: 12px; padding: 24px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                   <div>
-                    <h3 style="font-family: serif; font-size: 1.4rem; color: #FFFFFF; margin: 0;"><i class="fa-solid fa-database" style="color: #2ECC71;"></i> Laragon MySQL Inspector</h3>
+                    <h3 style="font-family: serif; font-size: 1.4rem; color: #FFFFFF; margin: 0;"><i class="fa-solid fa-database" style="color: #2ECC71;"></i> Database Inspector (Supabase / SQLite)</h3>
                     <p style="color: #A1A1AA; font-size: 0.85rem; margin-top: 4px;">Database: <strong>${escapeHtml(data.db_name)}</strong> (${escapeHtml(data.db_engine)})</p>
                   </div>
                 </div>

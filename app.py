@@ -4,8 +4,8 @@ import json
 import secrets
 import hashlib
 import sqlite3
-import pymysql
-import pymysql.cursors
+import threading
+import time
 import smtplib
 import urllib.request
 from email.mime.text import MIMEText
@@ -62,12 +62,7 @@ if not POSTGRES_URL and os.environ.get('SUPABASE_DB_HOST'):
     _pg_name = os.environ.get('SUPABASE_DB_NAME', 'postgres')
     POSTGRES_URL = f"postgresql://{_pg_user}:{_pg_pass}@{_pg_host}:{_pg_port}/{_pg_name}"
 
-# --- MySQL Config (Local Laragon) ---
-MYSQL_HOST = os.environ.get('MYSQL_HOST', '127.0.0.1')
-MYSQL_USER = os.environ.get('MYSQL_USER', 'root')
-MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', '')
-MYSQL_DB = os.environ.get('MYSQL_DB', 'heena imitation jewellery')
-MYSQL_PORT = int(os.environ.get('MYSQL_PORT', 3306))
+# --- Database Configuration (Supabase Cloud PostgreSQL Primary, SQLite Resilient Fallback) ---
 
 # --- SQLite & Uploads Config (Local Fallback & Serverless Resilient) ---
 SQLITE_DB = os.environ.get('SQLITE_DB_PATH')
@@ -218,7 +213,7 @@ def get_postgres_connection():
 def get_db():
     db = getattr(g, '_database', None)
     if db is None:
-        # 1. Supabase / PostgreSQL (Production on Netlify)
+        # 1. Supabase / PostgreSQL (Production on Netlify & Cloud)
         if POSTGRES_URL:
             pg_conn = get_postgres_connection()
             if pg_conn:
@@ -226,23 +221,7 @@ def get_db():
                 g.db_type = 'postgres'
                 return g._database
 
-        # 2. MySQL (Local Laragon)
-        try:
-            db = g._database = pymysql.connect(
-                host=MYSQL_HOST,
-                user=MYSQL_USER,
-                password=MYSQL_PASSWORD,
-                database=MYSQL_DB,
-                port=MYSQL_PORT,
-                autocommit=True,
-                cursorclass=pymysql.cursors.DictCursor
-            )
-            g.db_type = 'mysql'
-            return db
-        except Exception:
-            pass
-
-        # 3. SQLite Fallback (Local file fallback)
+        # 2. SQLite Fallback (Zero configuration, reliable local storage)
         db = g._database = sqlite3.connect(SQLITE_DB)
         db.row_factory = sqlite3.Row
         g.db_type = 'sqlite'
@@ -370,6 +349,16 @@ def init_db():
                         token VARCHAR(100) NOT NULL,
                         expires_at TIMESTAMP NOT NULL,
                         is_used INT DEFAULT 0
+                    );
+
+                    CREATE TABLE IF NOT EXISTS abandoned_carts (
+                        id SERIAL PRIMARY KEY,
+                        user_email VARCHAR(150) UNIQUE NOT NULL,
+                        user_name VARCHAR(100),
+                        cart_json TEXT NOT NULL,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        reminder_1_sent INT DEFAULT 0,
+                        reminder_2_sent INT DEFAULT 0
                     );
                 ''')
 
@@ -519,318 +508,94 @@ def init_db():
         except Exception as pg_init_err:
             print("PostgreSQL/Supabase init note:", pg_init_err)
 
-    try:
-        conn = pymysql.connect(host=MYSQL_HOST, user=MYSQL_USER, password=MYSQL_PASSWORD, port=MYSQL_PORT, autocommit=True)
-        cursor = conn.cursor()
-        cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{MYSQL_DB}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
-        conn.close()
 
-        conn = pymysql.connect(host=MYSQL_HOST, user=MYSQL_USER, password=MYSQL_PASSWORD, database=MYSQL_DB, port=MYSQL_PORT, autocommit=True)
-        cursor = conn.cursor()
+
+    # 2. SQLite Fallback Tables & Seed Data (Reliable local storage without MySQL)
+    try:
+        s_conn = sqlite3.connect(SQLITE_DB)
+        s_cursor = s_conn.cursor()
+
+        # Categories
+        s_cursor.execute('''
+            CREATE TABLE IF NOT EXISTS categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                slug TEXT UNIQUE NOT NULL,
+                image TEXT NOT NULL,
+                description TEXT NOT NULL
+            )
+        ''')
 
         # Products
-        cursor.execute('''
+        s_cursor.execute('''
             CREATE TABLE IF NOT EXISTS products (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                category VARCHAR(100) NOT NULL,
-                price DECIMAL(10,2) NOT NULL,
-                original_price DECIMAL(10,2) NOT NULL,
-                discount_percent INT NOT NULL,
-                rating DECIMAL(3,2) DEFAULT 4.8,
-                review_count INT DEFAULT 12,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                category TEXT NOT NULL,
+                price REAL NOT NULL,
+                original_price REAL NOT NULL,
+                discount_percent INTEGER NOT NULL,
+                rating REAL DEFAULT 4.8,
+                review_count INTEGER DEFAULT 12,
                 image TEXT NOT NULL,
                 hover_image TEXT NOT NULL,
                 description TEXT NOT NULL,
                 specs TEXT NOT NULL,
-                is_best_seller INT DEFAULT 0,
-                is_new_arrival INT DEFAULT 0,
-                is_bridal INT DEFAULT 0,
-                color VARCHAR(50) NOT NULL,
-                material VARCHAR(50) NOT NULL,
-                occasion VARCHAR(50) NOT NULL,
-                stock INT DEFAULT 25
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                is_best_seller INTEGER DEFAULT 0,
+                is_new_arrival INTEGER DEFAULT 0,
+                is_bridal INTEGER DEFAULT 0,
+                color TEXT NOT NULL,
+                material TEXT NOT NULL,
+                occasion TEXT NOT NULL,
+                stock INTEGER DEFAULT 25
+            )
         ''')
 
-        # Categories
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS categories (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(100) NOT NULL,
-                slug VARCHAR(100) UNIQUE NOT NULL,
-                image TEXT NOT NULL,
-                description TEXT NOT NULL
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-        ''')
-
-        # Reviews
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS reviews (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                product_id INT NOT NULL,
-                user_name VARCHAR(100) NOT NULL,
-                rating INT NOT NULL,
-                comment TEXT NOT NULL,
-                date VARCHAR(50) NOT NULL
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        # Coupons
+        s_cursor.execute('''
+            CREATE TABLE IF NOT EXISTS coupons (
+                code TEXT PRIMARY KEY,
+                discount_type TEXT NOT NULL,
+                discount_value REAL NOT NULL,
+                min_order REAL DEFAULT 0
+            )
         ''')
 
         # Orders
-        cursor.execute('''
+        s_cursor.execute('''
             CREATE TABLE IF NOT EXISTS orders (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                order_code VARCHAR(50) UNIQUE NOT NULL,
-                customer_name VARCHAR(100) NOT NULL,
-                customer_email VARCHAR(100) NOT NULL,
-                customer_phone VARCHAR(50) NOT NULL,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_code TEXT UNIQUE NOT NULL,
+                customer_name TEXT NOT NULL,
+                customer_email TEXT NOT NULL,
+                customer_phone TEXT NOT NULL,
                 shipping_address TEXT NOT NULL,
-                items_json LONGTEXT NOT NULL,
-                subtotal DECIMAL(10,2) NOT NULL,
-                tax DECIMAL(10,2) NOT NULL,
-                shipping DECIMAL(10,2) NOT NULL,
-                discount DECIMAL(10,2) DEFAULT 0,
-                total DECIMAL(10,2) NOT NULL,
-                payment_method VARCHAR(50) NOT NULL,
-                payment_status VARCHAR(50) NOT NULL,
-                order_status VARCHAR(50) DEFAULT 'Placed',
-                created_at VARCHAR(50) NOT NULL,
-                email_notification_sent INT DEFAULT 0,
-                whatsapp_notification_sent INT DEFAULT 0
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-        ''')
-        try:
-            cursor.execute("SHOW COLUMNS FROM orders LIKE 'email_notification_sent'")
-            if not cursor.fetchone():
-                cursor.execute("ALTER TABLE orders ADD COLUMN email_notification_sent INT DEFAULT 0")
-            cursor.execute("SHOW COLUMNS FROM orders LIKE 'whatsapp_notification_sent'")
-            if not cursor.fetchone():
-                cursor.execute("ALTER TABLE orders ADD COLUMN whatsapp_notification_sent INT DEFAULT 0")
-        except Exception as e:
-            print("Orders notification columns migration note:", e)
-
-        # Coupons
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS coupons (
-                code VARCHAR(50) PRIMARY KEY,
-                discount_type VARCHAR(20) NOT NULL,
-                discount_value DECIMAL(10,2) NOT NULL,
-                min_order DECIMAL(10,2) DEFAULT 0
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                items_json TEXT NOT NULL,
+                subtotal REAL NOT NULL,
+                tax REAL NOT NULL,
+                shipping REAL NOT NULL,
+                discount REAL DEFAULT 0,
+                total REAL NOT NULL,
+                payment_method TEXT NOT NULL,
+                payment_status TEXT NOT NULL,
+                order_status TEXT DEFAULT 'Placed',
+                created_at TEXT NOT NULL,
+                email_notification_sent INTEGER DEFAULT 0,
+                whatsapp_notification_sent INTEGER DEFAULT 0
+            )
         ''')
 
-        # Customer Users (Email + Password + Google)
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                email VARCHAR(150) UNIQUE NOT NULL,
-                password_hash VARCHAR(255) NULL,
-                name VARCHAR(100),
-                created_at VARCHAR(50) NOT NULL,
-                last_login VARCHAR(50) NOT NULL
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        # Reviews
+        s_cursor.execute('''
+            CREATE TABLE IF NOT EXISTS reviews (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                product_id INTEGER NOT NULL,
+                user_name TEXT NOT NULL,
+                rating INTEGER NOT NULL,
+                comment TEXT NOT NULL,
+                date TEXT NOT NULL
+            )
         ''')
-        try:
-            cursor.execute("SHOW COLUMNS FROM users LIKE 'password_hash'")
-            if not cursor.fetchone():
-                cursor.execute("ALTER TABLE users ADD COLUMN password_hash VARCHAR(255) NULL")
-            cursor.execute("SHOW COLUMNS FROM users LIKE 'created_at'")
-            if not cursor.fetchone():
-                cursor.execute("ALTER TABLE users ADD COLUMN created_at VARCHAR(50) NULL")
-            else:
-                cursor.execute("ALTER TABLE users MODIFY COLUMN created_at VARCHAR(50) NULL")
-            cursor.execute("SHOW COLUMNS FROM users LIKE 'last_login'")
-            if not cursor.fetchone():
-                cursor.execute("ALTER TABLE users ADD COLUMN last_login VARCHAR(50) NULL")
-            else:
-                cursor.execute("ALTER TABLE users MODIFY COLUMN last_login VARCHAR(50) NULL")
-            cursor.execute("SHOW COLUMNS FROM users LIKE 'name'")
-            if not cursor.fetchone():
-                cursor.execute("ALTER TABLE users ADD COLUMN name VARCHAR(100) NULL")
-            cursor.execute("SHOW COLUMNS FROM users LIKE 'identifier'")
-            if cursor.fetchone():
-                cursor.execute("ALTER TABLE users MODIFY COLUMN identifier VARCHAR(150) NULL")
-            cursor.execute("SHOW COLUMNS FROM users LIKE 'phone'")
-            if cursor.fetchone():
-                cursor.execute("ALTER TABLE users MODIFY COLUMN phone VARCHAR(50) NULL")
-        except Exception as e:
-            print("Users migration note:", e)
-
-        # Password Resets Table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS password_resets (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                email VARCHAR(150) NOT NULL,
-                token VARCHAR(100) NOT NULL,
-                expires_at DATETIME NOT NULL,
-                is_used INT DEFAULT 0
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-        ''')
-
-        # Category migration Gajra -> Scrunchies & Garters
-        try:
-            cursor.execute("UPDATE products SET category = 'Scrunchies & Garters' WHERE category = 'Gajra/Garder' OR category LIKE '%Gajra%'")
-            cursor.execute("UPDATE categories SET name = 'Scrunchies & Garters', slug = 'scrunchies-garters', description = 'Luxury Satin Silk Scrunchies & Hair Garters' WHERE name = 'Gajra/Garder' OR slug = 'gajra-garder' OR name LIKE '%Gajra%'")
-            cursor.execute("UPDATE products SET name = 'Handcrafted Silk Satin Pearl Scrunchie', description = 'Premium silk satin hair scrunchie with faux pearl accents and comfortable elastic band.' WHERE name LIKE '%Gajra%'")
-        except Exception as e:
-            print("Category migration note:", e)
-
-        cursor.execute("SELECT COUNT(*) FROM categories")
-        if cursor.fetchone()[0] == 0:
-            categories = [
-                ("Necklaces", "necklaces", "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=600&q=80", "Statement, Kundan & Choker Necklaces"),
-                ("Earrings", "earrings", "https://images.unsplash.com/photo-1630019852942-f89202989a59?auto=format&fit=crop&w=600&q=80", "Jhumkas, Chandbalis & Studs"),
-                ("Pendants", "pendants", "https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&w=600&q=80", "Minimal & Zircon Pendant Sets"),
-                ("Bracelets", "bracelets", "https://images.unsplash.com/photo-1611591475140-be38b638edec?auto=format&fit=crop&w=600&q=80", "Antique Gold Cuffs & Bangles"),
-                ("Rings", "rings", "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?auto=format&fit=crop&w=600&q=80", "Solitaire & Cocktail Statement Rings"),
-                ("Bridal Sets", "bridal-sets", "/static/images/bridal_spotlight.jpg", "Grand Maharani Bridal Kundan Sets"),
-                ("Clutchers", "clutchers", "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=600&q=80", "Embellished Hair Accessories & Clutchers"),
-                ("Scrunchies & Garters", "scrunchies-garters", "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=600&q=80", "Luxury Satin Silk Scrunchies & Hair Garters")
-            ]
-            cursor.executemany("INSERT INTO categories (name, slug, image, description) VALUES (%s, %s, %s, %s)", categories)
-
-        cursor.execute("SELECT COUNT(*) FROM coupons")
-        if cursor.fetchone()[0] == 0:
-            coupons = [
-                ("HEENA10", "percentage", 10.0, 499.0),
-                ("BRIDAL15", "percentage", 15.0, 1999.0),
-                ("FESTIVE200", "flat", 200.0, 999.0),
-                ("WELCOME500", "flat", 500.0, 2499.0)
-            ]
-            cursor.executemany("INSERT INTO coupons (code, discount_type, discount_value, min_order) VALUES (%s, %s, %s, %s)", coupons)
-
-        cursor.execute("SELECT COUNT(*) FROM products")
-        if cursor.fetchone()[0] == 0:
-            products = [
-                ("Royal Emerald Kundan Choker Set", "Necklaces", 1899, 2999, 36, 4.9, 42,
-                 "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=800&q=80",
-                 "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=800&q=80",
-                 "Exquisite antique gold finish choker necklace studded with vibrant green emerald style Kundan stones and shell pearl drop beads. Comes with matching earrings.",
-                 json.dumps({"Material": "Brass Alloy", "Plating": "22k Antique Gold", "Stone": "Kundan & Faux Emerald", "Occasion": "Festive / Wedding", "Care": "Avoid direct spray of perfume or water"}),
-                 1, 1, 0, "Green", "Brass", "Festive", 18),
-
-                ("Heritage Temple Gold Necklace", "Necklaces", 2499, 3999, 37, 4.8, 28,
-                 "https://images.unsplash.com/photo-1611591475140-be38b638edec?auto=format&fit=crop&w=800&q=80",
-                 "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=800&q=80",
-                 "Traditional South Indian temple design necklace featuring intricate Goddess motif carving and antique champagne gold polish.",
-                 json.dumps({"Material": "High Grade Copper Alloy", "Plating": "Matt Antique Gold", "Stone": "Ruby Red CZ", "Occasion": "Festive / Pooja", "Care": "Store in airtight velvet pouch"}),
-                 1, 0, 0, "Gold", "Alloy", "Festive", 12),
-
-                ("Maharani Oversized Chandbali", "Earrings", 1199, 1799, 33, 4.8, 31,
-                 "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=800&q=80",
-                 "https://images.unsplash.com/photo-1630019852942-f89202989a59?auto=format&fit=crop&w=800&q=80",
-                 "Crescent-shaped Chandbali earrings adorned with Kundan work and maroon bead droppings. Perfect pair for ethnic silk sarees.",
-                 json.dumps({"Material": "Brass", "Plating": "Gold Plated", "Stone": "Kundan & Maroon Beads", "Occasion": "Festive / Wedding", "Care": "Store in soft cotton pouch"}),
-                 1, 1, 0, "Maroon", "Kundan", "Festive", 15),
-
-                ("Rose Gold Zircon Huggie Studs", "Earrings", 499, 799, 37, 4.6, 22,
-                 "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?auto=format&fit=crop&w=800&q=80",
-                 "https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&w=800&q=80",
-                 "Sparkling rose gold polished zircon stud earrings designed for office wear and everyday casual sophistication.",
-                 json.dumps({"Material": "Copper", "Plating": "Rose Gold", "Stone": "American Diamond", "Occasion": "Daily Wear", "Care": "Clean gently with dry cloth"}),
-                 0, 0, 0, "Rose Gold", "Zircon", "Daily", 30),
-
-                ("Royal Solitaire Zircon Pendant Set", "Pendants", 799, 1299, 38, 4.9, 39,
-                 "https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&w=800&q=80",
-                 "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=800&q=80",
-                 "Classic heart solitaire cubic zirconia pendant chain set in 18k champagne gold plating with matching stud earrings.",
-                 json.dumps({"Material": "Brass", "Plating": "18k Champagne Gold", "Stone": "CZ Diamond", "Occasion": "Daily / Gifting", "Care": "Keep in airtight box"}),
-                 1, 0, 0, "Gold", "Zircon", "Daily", 20),
-
-                ("Floral Enamel Kundan Pendant", "Pendants", 699, 1099, 36, 4.7, 18,
-                 "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=800&q=80",
-                 "https://images.unsplash.com/photo-1611591475140-be38b638edec?auto=format&fit=crop&w=800&q=80",
-                 "Hand painted Meenakari enamel floral pendant with delicate Kundan center and gold beaded chain.",
-                 json.dumps({"Material": "Alloy", "Plating": "Gold Finish", "Stone": "Meenakari & Kundan", "Occasion": "Festive", "Care": "Avoid chemical exposure"}),
-                 0, 1, 0, "Maroon", "Alloy", "Festive", 16),
-
-                ("Antique Gold Royal Bangle Set", "Bracelets", 1299, 1999, 35, 4.8, 27,
-                 "https://images.unsplash.com/photo-1611591475140-be38b638edec?auto=format&fit=crop&w=800&q=80",
-                 "https://images.unsplash.com/photo-1630019852942-f89202989a59?auto=format&fit=crop&w=800&q=80",
-                 "Set of 4 intricate antique gold bangles embossed with floral motifs and ruby CZ accents.",
-                 json.dumps({"Material": "Brass", "Plating": "Antique Gold", "Stone": "CZ Stones", "Occasion": "Festive / Wedding", "Care": "Wipe after wear"}),
-                 1, 0, 0, "Gold", "Brass", "Festive", 22),
-
-                ("Rose Gold CZ Crystal Cuff", "Bracelets", 899, 1399, 35, 4.9, 14,
-                 "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?auto=format&fit=crop&w=800&q=80",
-                 "https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&w=800&q=80",
-                 "Flexible openable wrist cuff with pavé set AAA cubic zirconia stones in radiant rose gold shine.",
-                 json.dumps({"Material": "Alloy", "Plating": "Rose Gold", "Stone": "Cubic Zirconia", "Occasion": "Daily / Party", "Care": "Do not submerge in water"}),
-                 0, 1, 0, "Rose Gold", "Zircon", "Daily", 19),
-
-                ("Solitaire Crown Adjustable Ring", "Rings", 399, 699, 42, 4.8, 64,
-                 "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?auto=format&fit=crop&w=800&q=80",
-                 "https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&w=800&q=80",
-                 "Stunning crown design solitaire ring with adjustable band, suitable for all finger sizes.",
-                 json.dumps({"Material": "Brass", "Plating": "Rhodium Gold", "Stone": "American Diamond", "Occasion": "Daily / Gifting", "Care": "Keep dry"}),
-                 1, 1, 0, "Silver", "Zircon", "Daily", 50),
-
-                ("Traditional Kundan Cocktail Ring", "Rings", 599, 999, 40, 4.7, 33,
-                 "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=800&q=80",
-                 "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=800&q=80",
-                 "Statement oversized circular Kundan ring with pearl cluster border and adjustable ring base.",
-                 json.dumps({"Material": "Alloy", "Plating": "Antique Gold", "Stone": "Kundan & Pearls", "Occasion": "Festive / Wedding", "Care": "Store in soft box"}),
-                 0, 0, 0, "Gold", "Kundan", "Festive", 28),
-
-                ("Maharani Heritage Kundan Bridal Set", "Bridal Sets", 4999, 7999, 37, 5.0, 48,
-                 "/static/images/bridal_spotlight.jpg",
-                 "/static/images/hero_banner.jpg",
-                 "Complete 7-Piece Luxury Royal Bridal Jewellery Set: Heavy Choker, Long Haar Necklace, Matching Chandbalis, Maang Tikka, Hathphool Bangles, and Nose Ring in 24k Gold Polish & Maroon Gemstones.",
-                 json.dumps({"Material": "Premium Brass Alloy", "Plating": "24k Matt Antique Gold", "Stone": "Heritage Kundan & Maroon Gemstones", "Occasion": "Bridal", "Care": "Store in padded velvet bridal box"}),
-                 1, 1, 1, "Maroon", "Kundan", "Bridal", 10),
-
-                ("Royal Velvet Ruby Kundan Bridal Set", "Bridal Sets", 5499, 8999, 38, 4.9, 35,
-                 "/static/images/hero_banner.jpg",
-                 "/static/images/bridal_spotlight.jpg",
-                 "Opulent Rajputana style full bridal necklace set with cascading ruby drops, pearl clusters and matching heavy ear cuff jhumkas.",
-                 json.dumps({"Material": "Heavy Brass Alloy", "Plating": "Antique Champagne Gold", "Stone": "Ruby & Kundan Glass", "Occasion": "Bridal", "Care": "Keep dry and store safely"}),
-                 1, 0, 1, "Maroon", "Kundan", "Bridal", 8),
-
-                ("Royal Pearl Embellished Clutcher", "Clutchers", 349, 599, 41, 4.6, 21,
-                 "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=800&q=80",
-                 "https://images.unsplash.com/photo-1630019852942-f89202989a59?auto=format&fit=crop&w=800&q=80",
-                 "Heavy gold metal hair clutcher encrusted with lustrous faux pearls and shiny zircons.",
-                 json.dumps({"Material": "Metal Alloy", "Plating": "Gold Plated", "Stone": "Faux Pearl", "Occasion": "Daily / Festive", "Care": "Handle gently"}),
-                 1, 0, 0, "Gold", "Pearl", "Daily", 45),
-
-                ("Golden Crystal Butterfly Hair Clip", "Clutchers", 299, 499, 40, 4.5, 18,
-                 "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?auto=format&fit=crop&w=800&q=80",
-                 "https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&w=800&q=80",
-                 "Elegant butterfly shape hair pin with crystal rhinestones for hairstyles at parties and weddings.",
-                 json.dumps({"Material": "Alloy", "Plating": "Gold Finish", "Stone": "Rhinestone", "Occasion": "Festive / Party", "Care": "Avoid bending"}),
-                 0, 1, 0, "Gold", "Alloy", "Festive", 35),
-
-                ("Handcrafted Silk Satin Pearl Scrunchie", "Scrunchies & Garters", 499, 799, 37, 4.9, 44,
-                 "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=800&q=80",
-                 "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=800&q=80",
-                 "Premium silk satin hair scrunchie with faux pearl accents and comfortable elastic band.",
-                 json.dumps({"Material": "Fabric & Faux Pearls", "Plating": "N/A", "Stone": "Pearl Drops", "Occasion": "Festive / Bridal", "Care": "Store in soft box"}),
-                 1, 1, 1, "Gold", "Pearl", "Bridal", 50),
-
-                ("Antique Gold Floral Hair Garter", "Scrunchies & Garters", 699, 1099, 36, 4.8, 29,
-                 "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=800&q=80",
-                 "https://images.unsplash.com/photo-1611591475140-be38b638edec?auto=format&fit=crop&w=800&q=80",
-                 "Traditional South Indian bun decoration hair garter with golden flower links and ruby accents.",
-                 json.dumps({"Material": "Brass", "Plating": "Antique Gold", "Stone": "Ruby CZ", "Occasion": "Bridal / Festive", "Care": "Wipe dry after use"}),
-                 0, 0, 1, "Maroon", "Brass", "Bridal", 22)
-            ]
-            cursor.executemany('''
-                INSERT INTO products (
-                    name, category, price, original_price, discount_percent, rating, review_count,
-                    image, hover_image, description, specs, is_best_seller, is_new_arrival,
-                    is_bridal, color, material, occasion, stock
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ''', products)
-
-        conn.close()
-
-    except Exception as e:
-        print("MySQL init note:", e)
-
-    # Always ensure SQLite fallback tables exist and are up to date
-    try:
-        s_conn = sqlite3.connect(SQLITE_DB)
-        s_cursor = s_conn.cursor()
 
         # Users table
         s_cursor.execute('''
@@ -855,13 +620,61 @@ def init_db():
             )
         ''')
 
-        # Orders table notification columns
+        # Abandoned Carts table (Auto-purged after max 3 days)
+        s_cursor.execute('''
+            CREATE TABLE IF NOT EXISTS abandoned_carts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_email TEXT UNIQUE NOT NULL,
+                user_name TEXT,
+                cart_json TEXT NOT NULL,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                reminder_1_sent INTEGER DEFAULT 0,
+                reminder_2_sent INTEGER DEFAULT 0
+            )
+        ''')
+
+        # Orders table notification columns check
         cols = [col[1] for col in s_cursor.execute("PRAGMA table_info(orders)").fetchall()]
         if cols:
             if 'email_notification_sent' not in cols:
                 s_cursor.execute("ALTER TABLE orders ADD COLUMN email_notification_sent INTEGER DEFAULT 0")
             if 'whatsapp_notification_sent' not in cols:
                 s_cursor.execute("ALTER TABLE orders ADD COLUMN whatsapp_notification_sent INTEGER DEFAULT 0")
+
+        # Seed categories in SQLite if empty
+        s_cursor.execute("SELECT COUNT(*) FROM categories")
+        if s_cursor.fetchone()[0] == 0:
+            s_cursor.executemany("INSERT INTO categories (name, slug, image, description) VALUES (?, ?, ?, ?)", [
+                ("Necklaces", "necklaces", "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=600&q=80", "Statement, Kundan & Choker Necklaces"),
+                ("Earrings", "earrings", "https://images.unsplash.com/photo-1630019852942-f89202989a59?auto=format&fit=crop&w=600&q=80", "Jhumkas, Chandbalis & Studs"),
+                ("Pendants", "pendants", "https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&w=600&q=80", "Minimal & Zircon Pendant Sets"),
+                ("Bracelets", "bracelets", "https://images.unsplash.com/photo-1611591475140-be38b638edec?auto=format&fit=crop&w=600&q=80", "Antique Gold Cuffs & Bangles"),
+                ("Rings", "rings", "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?auto=format&fit=crop&w=600&q=80", "Solitaire & Cocktail Statement Rings"),
+                ("Bridal Sets", "bridal-sets", "/static/images/bridal_spotlight.jpg", "Grand Maharani Bridal Kundan Sets"),
+                ("Clutchers", "clutchers", "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=600&q=80", "Embellished Hair Accessories & Clutchers"),
+                ("Scrunchies & Garters", "scrunchies-garters", "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=600&q=80", "Luxury Satin Silk Scrunchies & Hair Garters")
+            ])
+
+        # Seed coupons in SQLite if empty
+        s_cursor.execute("SELECT COUNT(*) FROM coupons")
+        if s_cursor.fetchone()[0] == 0:
+            s_cursor.executemany("INSERT INTO coupons (code, discount_type, discount_value, min_order) VALUES (?, ?, ?, ?)", [
+                ("HEENA10", "percentage", 10.0, 499.0),
+                ("BRIDAL15", "percentage", 15.0, 1999.0),
+                ("FESTIVE200", "flat", 200.0, 999.0),
+                ("WELCOME500", "flat", 500.0, 2499.0)
+            ])
+
+        # Seed products in SQLite if empty
+        s_cursor.execute("SELECT COUNT(*) FROM products")
+        if s_cursor.fetchone()[0] == 0:
+            s_cursor.executemany('''
+                INSERT INTO products (
+                    name, category, price, original_price, discount_percent, rating, review_count,
+                    image, hover_image, description, specs, is_best_seller, is_new_arrival,
+                    is_bridal, color, material, occasion, stock
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', from_default_products)
 
         # Migrate Gajra -> Scrunchies & Garters in SQLite
         s_cursor.execute("UPDATE products SET category = 'Scrunchies & Garters' WHERE category = 'Gajra/Garder' OR category LIKE '%Gajra%'")
@@ -1486,6 +1299,46 @@ def validate_coupon():
         'message': f"Coupon '{code}' applied successfully!"
     })
 
+def send_smtp_email(to_email, subject, body_text, body_html):
+    """Robust SMTP sender with Dual TLS (587) and SSL (465) fallback and 10s timeout."""
+    smtp_server = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
+    smtp_port = int(os.environ.get('SMTP_PORT', 587))
+    smtp_user = (os.environ.get('SMTP_USER') or '').strip() or ADMIN_EMAIL
+    smtp_pass = (os.environ.get('SMTP_PASSWORD') or '').strip().replace(' ', '')
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = subject
+    msg['From'] = f"Heena Imitation Jewellery <{smtp_user}>"
+    msg['To'] = to_email
+    msg.attach(MIMEText(body_text, 'plain', 'utf-8'))
+    msg.attach(MIMEText(body_html, 'html', 'utf-8'))
+
+    if smtp_user and smtp_pass:
+        try:
+            if smtp_port == 465:
+                server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10)
+            else:
+                server = smtplib.SMTP(smtp_server, smtp_port, timeout=10)
+                server.starttls()
+            with server:
+                server.login(smtp_user, smtp_pass)
+                server.sendmail(smtp_user, [to_email], msg.as_string())
+            print(f"[EMAIL SENT] to {to_email} | Subject: {subject}")
+            return True
+        except Exception as e1:
+            try:
+                with smtplib.SMTP_SSL(smtp_server, 465, timeout=10) as ssl_server:
+                    ssl_server.login(smtp_user, smtp_pass)
+                    ssl_server.sendmail(smtp_user, [to_email], msg.as_string())
+                print(f"[EMAIL SENT (SSL 465)] to {to_email} | Subject: {subject}")
+                return True
+            except Exception as e2:
+                print(f"SMTP send failed to {to_email}: TLS={e1}, SSL={e2}")
+                return False
+    else:
+        print(f"[DEV CONSOLE EMAIL] to {to_email}: {subject}")
+        return True
+
 def send_admin_order_email(order):
     order_id = order.get('order_id')
     db = get_db()
@@ -1502,11 +1355,6 @@ def send_admin_order_email(order):
         if row and row.get('email_notification_sent') == 1:
             print(f"[DUPLICATE PREVENTED] Email notification already sent for order #{order.get('order_code')}")
             return True
-
-    smtp_server = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
-    smtp_port = int(os.environ.get('SMTP_PORT', 587))
-    smtp_user = (os.environ.get('SMTP_USER') or '').strip() or ADMIN_EMAIL
-    smtp_pass = (os.environ.get('SMTP_PASSWORD') or '').strip()
 
     items = order.get('items', [])
     items_rows_text = []
@@ -1613,47 +1461,8 @@ Payment Status: {order.get('payment_status')}
     """
 
     subject = f"🔔 New Order #{order.get('order_code')} — Rs. {order.get('total')} — Heena Imitation Jewellery"
-    msg = MIMEMultipart('alternative')
-    msg['Subject'] = subject
-    msg['From'] = f"Heena Orders <{smtp_user}>"
-    msg['To'] = ADMIN_EMAIL
-    msg.attach(MIMEText(body_text, 'plain', 'utf-8'))
-    msg.attach(MIMEText(body_html, 'html', 'utf-8'))
-
-    sent_success = False
-    if smtp_user and smtp_pass:
-        # Try TLS (587) first with timeout
-        try:
-            if smtp_port == 465:
-                server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10)
-            else:
-                server = smtplib.SMTP(smtp_server, smtp_port, timeout=10)
-                server.starttls()
-            with server:
-                server.login(smtp_user, smtp_pass)
-                server.sendmail(smtp_user, [ADMIN_EMAIL], msg.as_string())
-            print(f"[ADMIN ORDER EMAIL SENT] to {ADMIN_EMAIL} for Order #{order.get('order_code')}")
-            sent_success = True
-        except Exception as e1:
-            # Fallback to SSL (port 465) if TLS failed
-            try:
-                with smtplib.SMTP_SSL(smtp_server, 465, timeout=10) as ssl_server:
-                    ssl_server.login(smtp_user, smtp_pass)
-                    ssl_server.sendmail(smtp_user, [ADMIN_EMAIL], msg.as_string())
-                print(f"[ADMIN ORDER EMAIL SENT (SSL 465)] to {ADMIN_EMAIL} for Order #{order.get('order_code')}")
-                sent_success = True
-            except Exception as e2:
-                print(f"Admin Order Email SMTP Error: TLS={e1}, SSL={e2}")
-                sent_success = False
-    else:
-        print(f"==================================================")
-        print(f"[ADMIN ORDER EMAIL NOTIFICATION] TO: {ADMIN_EMAIL}")
-        print(f"SUBJECT: {subject}")
-        print(body_text)
-        print(f"==================================================")
-        sent_success = True
-
-    if sent_success and order_id:
+    sent = send_smtp_email(ADMIN_EMAIL, subject, body_text, body_html)
+    if sent and order_id:
         try:
             if getattr(g, 'db_type', '') in ('mysql', 'postgres'):
                 cursor = db.cursor()
@@ -1663,13 +1472,456 @@ Payment Status: {order.get('payment_status')}
                 db.commit()
         except Exception as e:
             print("Error updating email_notification_sent:", e)
+    return sent
 
-    return sent_success
+def send_customer_order_invoice_email(order):
+    """Sends customer tax invoice & heartfelt Thank You confirmation email upon purchase."""
+    customer_email = order.get('customer_email')
+    if not customer_email:
+        return False
 
+    customer_name = order.get('customer_name', 'Valued Customer')
+    order_code = order.get('order_code', '')
+    total = order.get('total', 0)
+    items = order.get('items', [])
 
-def send_admin_order_whatsapp(order):
-    """WhatsApp order alerts removed as requested. Email notifications used exclusively."""
-    return True
+    items_rows_text = []
+    items_rows_html = []
+    for item in items:
+        name = item.get('name', 'Product')
+        qty = int(item.get('qty', 1))
+        price = float(item.get('price', 0))
+        sub = price * qty
+        img = item.get('image', '')
+        img_html = f'<img src="{img}" width="48" height="48" style="border-radius: 4px; object-fit: cover; vertical-align: middle; margin-right: 10px;" />' if img else ''
+        items_rows_text.append(f"• {name} x {qty} = Rs. {sub:,.2f}")
+        items_rows_html.append(f"""
+            <tr>
+                <td style="padding: 12px 10px; border-bottom: 1px solid #f0e6d2;">
+                    {img_html}
+                    <span style="font-weight: 500; color: #1f1a17;">{name}</span>
+                </td>
+                <td style="padding: 12px 10px; border-bottom: 1px solid #f0e6d2; text-align: center; color: #555;">{qty}</td>
+                <td style="padding: 12px 10px; border-bottom: 1px solid #f0e6d2; text-align: right; color: #555;">Rs. {price:,.2f}</td>
+                <td style="padding: 12px 10px; border-bottom: 1px solid #f0e6d2; text-align: right; font-weight: bold; color: #b8860b;">Rs. {sub:,.2f}</td>
+            </tr>
+        """)
+
+    items_list_str = "\n".join(items_rows_text)
+    items_table_html = "".join(items_rows_html)
+
+    body_text = f"""HEENA IMITATION JEWELLERS — ORDER CONFIRMATION & BILL
+
+Dear {customer_name},
+
+Thank you so much for choosing Heena Imitation Jewellery! We are delighted to confirm that your order #{order_code} has been successfully placed.
+
+--- ORDER RECEIPT ---
+Order Number: #{order_code}
+Date: {order.get('created_at')}
+Payment Method: {order.get('payment_method')}
+Payment Status: {order.get('payment_status')}
+
+--- ITEMS PURCHASED ---
+{items_list_str}
+
+Subtotal: Rs. {order.get('subtotal')}
+Shipping: Rs. {order.get('shipping')}
+Discount: -Rs. {order.get('discount')}
+TOTAL AMOUNT: Rs. {order.get('total')}
+
+--- DELIVERY ADDRESS ---
+{order.get('shipping_address')}
+Contact: {order.get('customer_phone')}
+
+Your order is being carefully packaged by our artisans and will be dispatched within 24-48 business hours.
+
+Need assistance? Reply directly to this email or reach us on WhatsApp at +91 9777166165.
+
+With warm regards,
+Heena Imitation Jewellery Team
+"""
+
+    body_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #faf8f5; margin: 0; padding: 24px; color: #333;">
+        <div style="max-width: 620px; margin: 0 auto; background: #ffffff; border-radius: 10px; border: 1px solid #d4af37; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
+            
+            <div style="background: linear-gradient(135deg, #1a1614, #2d241d); color: #d4af37; padding: 28px 20px; text-align: center;">
+                <h1 style="margin: 0; font-size: 24px; letter-spacing: 2.5px; font-weight: 700;">HEENA IMITATION JEWELLERS</h1>
+                <p style="margin: 6px 0 0 0; color: #e6dfd5; font-size: 13px; letter-spacing: 1px; text-transform: uppercase;">Handcrafted Luxury & Heritage Adornments</p>
+                <div style="display: inline-block; background: rgba(212,175,55,0.18); border: 1px solid #d4af37; color: #f5d77f; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-top: 14px;">
+                    ✨ Thank You For Your Order!
+                </div>
+            </div>
+
+            <div style="padding: 26px;">
+                <p style="font-size: 15px; color: #222; margin-top: 0;">
+                    Dear <strong>{customer_name}</strong>,
+                </p>
+                <p style="font-size: 14px; color: #555; line-height: 1.6;">
+                    Thank you so much for shopping with us! We have received your order <strong>#{order_code}</strong>. Our artisans and dispatch team are packing your jewellery with the utmost care.
+                </p>
+
+                <div style="background: #fdfbf7; border-left: 4px solid #d4af37; padding: 12px 16px; border-radius: 4px; margin: 20px 0;">
+                    <div style="font-size: 14px; color: #1a1614;">
+                        <strong>Order Number:</strong> <span style="color: #b8860b; font-weight: bold;">#{order_code}</span>
+                    </div>
+                    <div style="font-size: 13px; color: #777; margin-top: 4px;">
+                        <strong>Date:</strong> {order.get('created_at')} &nbsp;|&nbsp; <strong>Status:</strong> Confirmed
+                    </div>
+                </div>
+
+                <h3 style="color: #1a1614; font-size: 15px; margin: 24px 0 10px 0; border-bottom: 2px solid #f0e6d2; padding-bottom: 6px;">
+                    🧾 Tax Invoice / Itemized Bill
+                </h3>
+                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                    <thead>
+                        <tr style="background: #f9f6f0; color: #5a4b41;">
+                            <th style="padding: 10px; text-align: left;">Item</th>
+                            <th style="padding: 10px; text-align: center;">Qty</th>
+                            <th style="padding: 10px; text-align: right;">Price</th>
+                            <th style="padding: 10px; text-align: right;">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {items_table_html}
+                    </tbody>
+                </table>
+
+                <div style="text-align: right; font-size: 14px; line-height: 1.8; border-top: 2px solid #f0e6d2; padding-top: 14px; margin-top: 6px;">
+                    <div>Subtotal: <strong>Rs. {order.get('subtotal')}</strong></div>
+                    <div>Shipping: <strong>{'FREE' if float(order.get('shipping', 0)) == 0 else f'Rs. {order.get("shipping")}'}</strong></div>
+                    {f'<div style="color: #27ae60;">Discount: <strong>-Rs. {order.get("discount")}</strong></div>' if float(order.get('discount', 0)) > 0 else ''}
+                    <div style="font-size: 18px; font-weight: bold; color: #b8860b; margin-top: 8px;">
+                        Grand Total: Rs. {order.get('total')}
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 22px; font-size: 13px;">
+                    <div style="background: #fdfbf7; padding: 12px; border-radius: 6px; border: 1px solid #efe8db;">
+                        <strong style="color: #1a1614;">📍 Shipping Address:</strong>
+                        <p style="margin: 4px 0 0 0; color: #555; line-height: 1.5;">
+                            {order.get('shipping_address')}<br>
+                            Phone: {order.get('customer_phone')}
+                        </p>
+                    </div>
+                    <div style="background: #fdfbf7; padding: 12px; border-radius: 6px; border: 1px solid #efe8db;">
+                        <strong style="color: #1a1614;">💳 Payment Details:</strong>
+                        <p style="margin: 4px 0 0 0; color: #555; line-height: 1.5;">
+                            Method: {order.get('payment_method')}<br>
+                            Status: <span style="color: {'#27ae60' if 'Paid' in str(order.get('payment_status')) else '#e67e22'}; font-weight: 600;">{order.get('payment_status')}</span>
+                        </p>
+                    </div>
+                </div>
+
+                <div style="margin-top: 22px; padding: 14px; background: #f5f2eb; border-radius: 6px; font-size: 13px; color: #666; line-height: 1.5;">
+                    <strong style="color: #1a1614;">📦 Dispatch & Delivery:</strong><br>
+                    Your parcel will be carefully packaged and dispatched within 24–48 hours. If you have questions about your order, reply to this email or chat with us on WhatsApp at <a href="https://wa.me/919777166165" style="color: #b8860b; font-weight: bold; text-decoration: none;">+91 9777166165</a>.
+                </div>
+            </div>
+
+            <div style="background: #1a1614; color: #a19a91; padding: 18px; text-align: center; font-size: 12px; border-top: 1px solid #d4af37;">
+                <div style="color: #d4af37; font-weight: 600; margin-bottom: 4px;">Heena Imitation Jewellery</div>
+                Support: <a href="mailto:heenaimitationjewellery06@gmail.com" style="color: #e6dfd5; text-decoration: none;">heenaimitationjewellery06@gmail.com</a> | WhatsApp: +91 9777166165<br>
+                Thank you for being our valued customer!
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    subject = f"✨ Order Confirmed #{order_code} — Heena Imitation Jewellery Invoice & Receipt"
+    return send_smtp_email(customer_email, subject, body_text, body_html)
+
+def send_cart_reminder_email(user_email, user_name, cart_items, reminder_stage=1):
+    """Sends 24-hour reminder (#1) or final pre-expiry warning (#2) for abandoned carts."""
+    if not user_email or not cart_items:
+        return False
+
+    customer_name = user_name or user_email.split('@')[0].capitalize()
+    total_val = sum(float(item.get('price', 0)) * int(item.get('qty', 1)) for item in cart_items)
+
+    items_rows_text = []
+    items_rows_html = []
+    for item in cart_items:
+        name = item.get('name', 'Product')
+        qty = int(item.get('qty', 1))
+        price = float(item.get('price', 0))
+        sub = price * qty
+        img = item.get('image', '')
+        img_html = f'<img src="{img}" width="48" height="48" style="border-radius: 4px; object-fit: cover; vertical-align: middle; margin-right: 10px;" />' if img else ''
+        items_rows_text.append(f"• {name} x {qty} = Rs. {sub:,.2f}")
+        items_rows_html.append(f"""
+            <tr>
+                <td style="padding: 10px; border-bottom: 1px solid #f0e6d2;">
+                    {img_html}
+                    <span style="font-weight: 500; color: #1f1a17;">{name}</span>
+                </td>
+                <td style="padding: 10px; border-bottom: 1px solid #f0e6d2; text-align: center; color: #555;">{qty}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #f0e6d2; text-align: right; font-weight: bold; color: #b8860b;">Rs. {sub:,.2f}</td>
+            </tr>
+        """)
+
+    items_list_str = "\n".join(items_rows_text)
+    items_table_html = "".join(items_rows_html)
+
+    if reminder_stage == 1:
+        subject = f"🛒 Items waiting in your bag — Complete your purchase at Heena Imitation Jewellery"
+        badge_text = "✨ Items Waiting In Your Cart"
+        headline = "Did You Forget Something Beautiful?"
+        message = "We noticed you selected some handcrafted jewellery pieces, but didn't finish checking out. Because our collections are limited in stock, complete your order today before your favorites sell out!"
+        cta_text = "Complete Your Purchase Now"
+    else:
+        subject = f"⏳ Final Notice: Your saved cart is expiring today — Heena Imitation Jewellery"
+        badge_text = "⚠️ Reserved Cart Expiring Today"
+        headline = "Final Reminder: Your Cart Is About To Expire"
+        message = "This is your final notice. To release reserved designs for other jewellery lovers, your saved cart will be automatically cleared today. If you would still like to own these pieces, complete your purchase now!"
+        cta_text = "Claim Your Jewellery Before It's Gone"
+
+    body_text = f"""HEENA IMITATION JEWELLERS — {headline.upper()}
+
+Dear {customer_name},
+
+{message}
+
+--- ITEMS IN YOUR CART ---
+{items_list_str}
+
+Total Value: Rs. {total_val:,.2f}
+
+Complete your purchase here: https://heena-imitation-jewellery.netlify.app/
+
+Support: heenaimitationjewellery06@gmail.com | WhatsApp: +91 9777166165
+"""
+
+    body_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #faf8f5; margin: 0; padding: 24px; color: #333;">
+        <div style="max-width: 620px; margin: 0 auto; background: #ffffff; border-radius: 10px; border: 1px solid #d4af37; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
+            
+            <div style="background: linear-gradient(135deg, #1a1614, #2d241d); color: #d4af37; padding: 28px 20px; text-align: center;">
+                <h1 style="margin: 0; font-size: 24px; letter-spacing: 2.5px; font-weight: 700;">HEENA IMITATION JEWELLERS</h1>
+                <p style="margin: 6px 0 0 0; color: #e6dfd5; font-size: 13px; letter-spacing: 1px; text-transform: uppercase;">Handcrafted Luxury & Heritage Adornments</p>
+                <div style="display: inline-block; background: rgba(212,175,55,0.18); border: 1px solid #d4af37; color: #f5d77f; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-top: 14px;">
+                    {badge_text}
+                </div>
+            </div>
+
+            <div style="padding: 26px;">
+                <h2 style="font-size: 19px; color: #1a1614; margin-top: 0;">{headline}</h2>
+                <p style="font-size: 15px; color: #222;">Dear <strong>{customer_name}</strong>,</p>
+                <p style="font-size: 14px; color: #555; line-height: 1.6;">
+                    {message}
+                </p>
+
+                <div style="margin: 20px 0; background: #fdfbf7; border: 1px solid #efe8db; border-radius: 8px; padding: 14px;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid #e8dec8; color: #5a4b41;">
+                                <th style="padding: 8px; text-align: left;">Product</th>
+                                <th style="padding: 8px; text-align: center;">Qty</th>
+                                <th style="padding: 8px; text-align: right;">Price</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {items_table_html}
+                        </tbody>
+                    </table>
+                    <div style="text-align: right; padding-top: 10px; font-size: 15px; font-weight: bold; color: #b8860b;">
+                        Total Value: Rs. {total_val:,.2f}
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin: 28px 0 18px 0;">
+                    <a href="https://heena-imitation-jewellery.netlify.app/" style="background: linear-gradient(135deg, #d4af37, #b8860b); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 30px; font-weight: bold; font-size: 15px; display: inline-block; box-shadow: 0 4px 12px rgba(184,134,11,0.3);">
+                        👉 {cta_text}
+                    </a>
+                </div>
+                <p style="text-align: center; font-size: 12px; color: #888; margin-bottom: 0;">
+                    Free shipping & easy cash on delivery available across India.
+                </p>
+            </div>
+
+            <div style="background: #1a1614; color: #a19a91; padding: 16px; text-align: center; font-size: 12px; border-top: 1px solid #d4af37;">
+                <div style="color: #d4af37; font-weight: 600; margin-bottom: 4px;">Heena Imitation Jewellery</div>
+                Support: <a href="mailto:heenaimitationjewellery06@gmail.com" style="color: #e6dfd5; text-decoration: none;">heenaimitationjewellery06@gmail.com</a> | WhatsApp: +91 9777166165
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    return send_smtp_email(user_email, subject, body_text, body_html)
+
+def process_abandoned_carts_job():
+    """Processes abandoned carts:
+       1. Sends Reminder #1 after 24 hours.
+       2. Sends Final Reminder #2 before 72 hours (3 days).
+       3. Auto-purges records older than 72 hours (max 3 days) to keep database and server lean.
+    """
+    now = datetime.now()
+    results = {'reminder_1': 0, 'reminder_2': 0, 'purged': 0}
+    with app.app_context():
+        try:
+            db = get_db()
+            is_pg = getattr(g, 'db_type', '') in ('mysql', 'postgres')
+            if is_pg:
+                cur = db.cursor()
+                cur.execute("SELECT id, user_email, user_name, cart_json, updated_at, reminder_1_sent, reminder_2_sent FROM abandoned_carts")
+                rows = cur.fetchall()
+            else:
+                cur = db.execute("SELECT id, user_email, user_name, cart_json, updated_at, reminder_1_sent, reminder_2_sent FROM abandoned_carts")
+                rows = [dict(r) for r in cur.fetchall()]
+
+            for r in rows:
+                row_id = r['id'] if isinstance(r, dict) else r[0]
+                email = r['user_email'] if isinstance(r, dict) else r[1]
+                name = r['user_name'] if isinstance(r, dict) else r[2]
+                cart_json = r['cart_json'] if isinstance(r, dict) else r[3]
+                updated_at = r['updated_at'] if isinstance(r, dict) else r[4]
+                r1_sent = int(r['reminder_1_sent'] if isinstance(r, dict) else (r[5] or 0))
+                r2_sent = int(r['reminder_2_sent'] if isinstance(r, dict) else (r[6] or 0))
+
+                dt = now
+                if isinstance(updated_at, str):
+                    clean_str = updated_at.split('+')[0].split('Z')[0].strip()
+                    for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M:%S.%f'):
+                        try:
+                            dt = datetime.strptime(clean_str, fmt)
+                            break
+                        except Exception:
+                            pass
+                elif isinstance(updated_at, datetime):
+                    dt = updated_at.replace(tzinfo=None)
+
+                age_hours = (now - dt).total_seconds() / 3600.0
+
+                try:
+                    cart_items = json.loads(cart_json) if cart_json else []
+                except Exception:
+                    cart_items = []
+
+                if not cart_items:
+                    if is_pg:
+                        cur.execute("DELETE FROM abandoned_carts WHERE id = %s", (row_id,))
+                    else:
+                        db.execute("DELETE FROM abandoned_carts WHERE id = ?", (row_id,))
+                        db.commit()
+                    continue
+
+                # Stage 3: Expired after max 3 days (>= 72 hours) -> Auto-purge
+                if age_hours >= 72:
+                    if r2_sent == 0:
+                        send_cart_reminder_email(email, name, cart_items, reminder_stage=2)
+                        results['reminder_2'] += 1
+                    if is_pg:
+                        cur.execute("DELETE FROM abandoned_carts WHERE id = %s", (row_id,))
+                    else:
+                        db.execute("DELETE FROM abandoned_carts WHERE id = ?", (row_id,))
+                        db.commit()
+                    results['purged'] += 1
+                    print(f"[CART PURGED] Abandoned cart for {email} deleted automatically after 3 days.")
+
+                # Stage 2: Final reminder before 3-day deletion (between 60h and 72h)
+                elif age_hours >= 60 and r2_sent == 0:
+                    send_cart_reminder_email(email, name, cart_items, reminder_stage=2)
+                    if is_pg:
+                        cur.execute("UPDATE abandoned_carts SET reminder_2_sent = 1 WHERE id = %s", (row_id,))
+                    else:
+                        db.execute("UPDATE abandoned_carts SET reminder_2_sent = 1 WHERE id = ?", (row_id,))
+                        db.commit()
+                    results['reminder_2'] += 1
+
+                # Stage 1: 24-hour gentle reminder
+                elif age_hours >= 24 and r1_sent == 0:
+                    send_cart_reminder_email(email, name, cart_items, reminder_stage=1)
+                    if is_pg:
+                        cur.execute("UPDATE abandoned_carts SET reminder_1_sent = 1 WHERE id = %s", (row_id,))
+                    else:
+                        db.execute("UPDATE abandoned_carts SET reminder_1_sent = 1 WHERE id = ?", (row_id,))
+                        db.commit()
+                    results['reminder_1'] += 1
+
+        except Exception as e:
+            print("Error processing abandoned carts:", e)
+
+    return results
+
+def start_cart_reminder_scheduler():
+    def _loop():
+        time.sleep(20)
+        while True:
+            try:
+                process_abandoned_carts_job()
+            except Exception as e:
+                print("Cart scheduler error:", e)
+            time.sleep(1800)
+
+    thread = threading.Thread(target=_loop, daemon=True, name="CartReminderScheduler")
+    thread.start()
+
+@app.route('/api/cart/sync', methods=['POST'])
+def sync_cart():
+    """Syncs customer cart to abandoned_carts table for 24h & 3d reminders."""
+    email = session.get('user_email')
+    if not email:
+        return jsonify({'success': False, 'message': 'Not logged in'}), 200
+
+    data = request.json or {}
+    cart = data.get('cart', [])
+    user_name = session.get('user_name', email.split('@')[0])
+    db = get_db()
+    is_pg = getattr(g, 'db_type', '') in ('mysql', 'postgres')
+
+    if not cart:
+        if is_pg:
+            cursor = db.cursor()
+            cursor.execute("DELETE FROM abandoned_carts WHERE user_email = %s", (email,))
+        else:
+            db.execute("DELETE FROM abandoned_carts WHERE user_email = ?", (email,))
+            db.commit()
+        return jsonify({'success': True, 'synced': False})
+
+    cart_json = json.dumps(cart)
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    if is_pg:
+        cursor = db.cursor()
+        cursor.execute('''
+            INSERT INTO abandoned_carts (user_email, user_name, cart_json, updated_at, reminder_1_sent, reminder_2_sent)
+            VALUES (%s, %s, %s, CURRENT_TIMESTAMP, 0, 0)
+            ON CONFLICT (user_email) DO UPDATE SET
+                user_name = EXCLUDED.user_name,
+                cart_json = EXCLUDED.cart_json,
+                updated_at = CURRENT_TIMESTAMP,
+                reminder_1_sent = 0,
+                reminder_2_sent = 0
+        ''', (email, user_name, cart_json))
+    else:
+        db.execute('''
+            INSERT INTO abandoned_carts (user_email, user_name, cart_json, updated_at, reminder_1_sent, reminder_2_sent)
+            VALUES (?, ?, ?, ?, 0, 0)
+            ON CONFLICT(user_email) DO UPDATE SET
+                user_name = excluded.user_name,
+                cart_json = excluded.cart_json,
+                updated_at = excluded.updated_at,
+                reminder_1_sent = 0,
+                reminder_2_sent = 0
+        ''', (email, user_name, cart_json, now_str))
+        db.commit()
+
+    return jsonify({'success': True, 'synced': True})
+
+@app.route('/api/cron/cart-reminders', methods=['GET', 'POST'])
+def trigger_cart_reminders():
+    """Manual or scheduled webhook trigger for Netlify Scheduled Functions or Cron services."""
+    res = process_abandoned_carts_job()
+    return jsonify({'success': True, 'summary': res})
 
 
 @app.route('/api/orders', methods=['POST'])
@@ -1748,8 +2000,21 @@ def create_order():
         'created_at': created_at
     }
 
-    # Trigger admin email notification for EVERY order
+    # 1. Trigger admin email notification for EVERY order
     send_admin_order_email(order_dict)
+
+    # 2. Trigger customer tax invoice and Thank You email directly to customer
+    send_customer_order_invoice_email(order_dict)
+
+    # 3. Clean up customer's abandoned cart entry from database upon completed checkout
+    try:
+        if getattr(g, 'db_type', '') in ('mysql', 'postgres'):
+            cursor.execute("DELETE FROM abandoned_carts WHERE user_email = %s", (customer_email,))
+        else:
+            db.execute("DELETE FROM abandoned_carts WHERE user_email = ?", (customer_email,))
+            db.commit()
+    except Exception as cart_clean_err:
+        print("Completed order cart cleanup note:", cart_clean_err)
 
     return jsonify({
         'success': True,
@@ -1890,7 +2155,7 @@ def get_admin_stats():
 @admin_required
 def get_db_info():
     db = get_db()
-    db_engine = getattr(g, 'db_type', 'mysql')
+    db_engine = getattr(g, 'db_type', 'sqlite')
 
     if db_engine == 'postgres':
         cursor = db.cursor()
@@ -1909,26 +2174,6 @@ def get_db_info():
             'db_engine': 'Supabase PostgreSQL',
             'db_name': 'Supabase Database',
             'db_host': 'Supabase Cloud / Netlify Extension',
-            'tables': tables
-        })
-    elif db_engine == 'mysql':
-        cursor = db.cursor()
-        cursor.execute("SHOW TABLES")
-        table_rows = cursor.fetchall()
-        tables = []
-        for r in table_rows:
-            tname = list(r.values())[0]
-            cursor.execute(f"SHOW CREATE TABLE `{tname}`")
-            create_sql = list(cursor.fetchone().values())[1]
-            cursor.execute(f"SELECT COUNT(*) as c FROM `{tname}`")
-            cnt = cursor.fetchone()['c']
-            tables.append({'name': tname, 'sql': create_sql, 'row_count': cnt})
-        
-        return jsonify({
-            'success': True,
-            'db_engine': 'Laragon MySQL / MariaDB',
-            'db_name': MYSQL_DB,
-            'db_host': f"{MYSQL_HOST}:{MYSQL_PORT}",
             'tables': tables
         })
     else:
@@ -1953,7 +2198,7 @@ def get_db_info():
 def get_db_table_data(table_name):
     safe_table = re.sub(r'[^a-zA-Z0-9_]', '', table_name)
     db = get_db()
-    db_engine = getattr(g, 'db_type', 'mysql')
+    db_engine = getattr(g, 'db_type', 'sqlite')
 
     if db_engine == 'postgres':
         cursor = db.cursor()
@@ -1969,21 +2214,16 @@ def get_db_table_data(table_name):
                     item[k] = float(v)
             clean_rows.append(item)
         return jsonify({'success': True, 'table': safe_table, 'count': len(clean_rows), 'rows': clean_rows})
-    elif db_engine == 'mysql':
-        cursor = db.cursor()
-        cursor.execute(f"SELECT * FROM `{safe_table}` LIMIT 100")
-        rows = cursor.fetchall()
-        for r in rows:
-            for k, v in r.items():
-                if isinstance(v, (datetime, timedelta)):
-                    r[k] = str(v)
-                elif hasattr(v, 'quantize'):
-                    r[k] = float(v)
-        return jsonify({'success': True, 'table': safe_table, 'count': len(rows), 'rows': rows})
     else:
         rows_cursor = db.execute(f"SELECT * FROM [{safe_table}] LIMIT 100")
         rows = [dict(r) for r in rows_cursor.fetchall()]
         return jsonify({'success': True, 'table': safe_table, 'count': len(rows), 'rows': rows})
+
+# Start background worker for 24h & 3-day abandoned cart reminders & auto-purge
+try:
+    start_cart_reminder_scheduler()
+except Exception as sched_err:
+    print("Scheduler start note:", sched_err)
 
 if __name__ == '__main__':
     print(f"Heena Imitation Jewellery Server starting on http://127.0.0.1:5000 ...")

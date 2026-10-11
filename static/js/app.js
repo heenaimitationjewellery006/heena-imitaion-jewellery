@@ -195,6 +195,25 @@ function showToast(msg, type = 'success') {
   }, 4000);
 }
 
+// --- Server Cart Sync (Debounced for Abandoned Cart Reminders) ---
+let cartSyncTimeout = null;
+function syncCartWithServer() {
+  if (cartSyncTimeout) clearTimeout(cartSyncTimeout);
+  cartSyncTimeout = setTimeout(async () => {
+    try {
+      if (state.user && state.user.is_logged_in) {
+        await fetch('/api/cart/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cart: state.cart })
+        });
+      }
+    } catch (e) {
+      // Non-blocking background sync
+    }
+  }, 1200);
+}
+
 // --- Badges & Sync ---
 function updateBadges() {
   localStorage.setItem('hjm_cart', JSON.stringify(state.cart));
@@ -206,6 +225,8 @@ function updateBadges() {
 
   const wishlistBadge = document.getElementById('wishlistCount');
   if (wishlistBadge) wishlistBadge.textContent = state.wishlist.length;
+
+  syncCartWithServer();
 }
 
 // --- Category Grid ---
