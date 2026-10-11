@@ -4,6 +4,7 @@
 
 [build.environment]
   PYTHON_VERSION = "3.11"
+  SECRETS_SCAN_ENABLED = "false"
 
 [functions]
   included_files = ["templates/**", "static/**", "database.db"]
