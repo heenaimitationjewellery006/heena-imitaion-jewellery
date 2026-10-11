@@ -9,6 +9,7 @@ import pymysql.cursors
 import smtplib
 import urllib.request
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 from functools import wraps
 from dotenv import load_dotenv
@@ -42,8 +43,6 @@ ADMIN_ID = os.environ.get('ADMIN_ID', 'heena imitation jewellery')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'HeenaAdmin#2026')
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'heenaimitationjewellery06@gmail.com')
 ADMIN_WHATSAPP_NUMBER = os.environ.get('ADMIN_WHATSAPP_NUMBER', '919777166165')
-WHATSAPP_API_URL = os.environ.get('WHATSAPP_API_URL', '')
-WHATSAPP_API_TOKEN = os.environ.get('WHATSAPP_API_TOKEN', '')
 WHATSAPP_NUMBER = os.environ.get('WHATSAPP_NUMBER', '919777166165')
 
 # --- Supabase / PostgreSQL Config (Netlify Extension & Production) ---
@@ -1500,74 +1499,151 @@ def send_admin_order_email(order):
 
     smtp_server = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
     smtp_port = int(os.environ.get('SMTP_PORT', 587))
-    smtp_user = os.environ.get('SMTP_USER', '')
-    smtp_pass = os.environ.get('SMTP_PASSWORD', '')
+    smtp_user = (os.environ.get('SMTP_USER') or '').strip() or ADMIN_EMAIL
+    smtp_pass = (os.environ.get('SMTP_PASSWORD') or '').strip()
 
-    items_list_str = "\n".join([f"{item.get('name', 'Product')} x {item.get('qty', 1)}\nPrice: Rs. {item.get('price', 0)}\nSubtotal: Rs. {item.get('price', 0) * item.get('qty', 1)}\n" for item in order.get('items', [])])
+    items = order.get('items', [])
+    items_rows_text = []
+    items_rows_html = []
+    for item in items:
+        name = item.get('name', 'Product')
+        qty = item.get('qty', 1)
+        price = float(item.get('price', 0))
+        sub = price * qty
+        items_rows_text.append(f"• {name} x {qty} — Rs. {price:,.2f} (Subtotal: Rs. {sub:,.2f})")
+        items_rows_html.append(f"""
+            <tr>
+                <td style="padding: 10px; border-bottom: 1px solid #eee;">{name}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center;">{qty}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">Rs. {price:,.2f}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right; font-weight: bold; color: #b8860b;">Rs. {sub:,.2f}</td>
+            </tr>
+        """)
 
-    body = f"""NEW ORDER RECEIVED
+    items_list_str = "\n".join(items_rows_text)
+    items_table_html = "".join(items_rows_html)
 
-Heena Imitation Jewellery
+    body_text = f"""NEW ORDER RECEIVED — HEENA IMITATION JEWELLERS
 
-Order ID:
-#{order.get('order_code')}
+Order ID: #{order.get('order_code')}
+Date: {order.get('created_at')}
 
-Order Date & Time:
-{order.get('created_at')}
-
-Customer Details:
+--- CUSTOMER DETAILS ---
 Name: {order.get('customer_name')}
 Email: {order.get('customer_email')}
 Phone: {order.get('customer_phone')}
+Shipping Address: {order.get('shipping_address')}
 
-ORDER ITEMS:
-
+--- ORDER ITEMS ---
 {items_list_str}
+
+Subtotal: Rs. {order.get('subtotal')}
 Shipping: Rs. {order.get('shipping')}
 Discount: Rs. {order.get('discount')}
-Total: Rs. {order.get('total')}
+TOTAL: Rs. {order.get('total')}
 
-PAYMENT DETAILS:
-
-Payment Method:
-{order.get('payment_method').upper()}
-
-Payment Status:
-{order.get('payment_status').upper()}
-
-DELIVERY ADDRESS:
-
-Name: {order.get('customer_name')}
-Phone: {order.get('customer_phone')}
-Address: {order.get('shipping_address')}
+--- PAYMENT DETAILS ---
+Payment Method: {order.get('payment_method')}
+Payment Status: {order.get('payment_status')}
 """
 
-    subject = f"New Order Received — Heena Imitation Jewellery — Order #{order.get('order_code')}"
-    msg = MIMEText(body)
+    body_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="font-family: Arial, sans-serif; background-color: #faf8f5; margin: 0; padding: 20px; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #d4af37; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
+            <div style="background: linear-gradient(135deg, #1f1a17, #2c241e); color: #d4af37; padding: 22px; text-align: center;">
+                <h1 style="margin: 0; font-size: 22px; letter-spacing: 2px;">HEENA IMITATION JEWELLERS</h1>
+                <p style="margin: 6px 0 0 0; color: #f0e6d2; font-size: 14px;">🔔 New Order Received</p>
+            </div>
+            
+            <div style="padding: 22px;">
+                <div style="background: #fdfaf3; border-left: 4px solid #d4af37; padding: 12px 16px; margin-bottom: 20px;">
+                    <strong style="font-size: 16px; color: #1f1a17;">Order #{order.get('order_code')}</strong><br>
+                    <span style="color: #666; font-size: 13px;">Placed on: {order.get('created_at')}</span>
+                </div>
+
+                <h3 style="color: #1f1a17; border-bottom: 2px solid #f0e6d2; padding-bottom: 6px; margin-top: 18px; font-size: 15px;">Customer Details</h3>
+                <p style="margin: 4px 0; font-size: 14px;"><strong>Name:</strong> {order.get('customer_name')}</p>
+                <p style="margin: 4px 0; font-size: 14px;"><strong>Email:</strong> {order.get('customer_email')}</p>
+                <p style="margin: 4px 0; font-size: 14px;"><strong>Phone:</strong> {order.get('customer_phone')}</p>
+                <p style="margin: 4px 0; font-size: 14px;"><strong>Delivery Address:</strong> {order.get('shipping_address')}</p>
+
+                <h3 style="color: #1f1a17; border-bottom: 2px solid #f0e6d2; padding-bottom: 6px; margin-top: 22px; font-size: 15px;">Order Items</h3>
+                <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 15px;">
+                    <thead>
+                        <tr style="background: #fdfaf3; color: #5a4b41;">
+                            <th style="padding: 8px 10px; text-align: left;">Item</th>
+                            <th style="padding: 8px 10px; text-align: center;">Qty</th>
+                            <th style="padding: 8px 10px; text-align: right;">Price</th>
+                            <th style="padding: 8px 10px; text-align: right;">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {items_table_html}
+                    </tbody>
+                </table>
+
+                <div style="text-align: right; font-size: 14px; line-height: 1.8; border-top: 2px solid #f0e6d2; padding-top: 10px;">
+                    <div>Subtotal: Rs. {order.get('subtotal')}</div>
+                    <div>Shipping: Rs. {order.get('shipping')}</div>
+                    <div>Discount: -Rs. {order.get('discount')}</div>
+                    <div style="font-size: 18px; font-weight: bold; color: #b8860b; margin-top: 4px;">Total Amount: Rs. {order.get('total')}</div>
+                </div>
+
+                <div style="margin-top: 18px; padding: 12px; background: #fdfaf3; border-radius: 4px; font-size: 13px;">
+                    <strong>Payment Method:</strong> {order.get('payment_method')}<br>
+                    <strong>Payment Status:</strong> <span style="color: {'#28a745' if 'Paid' in str(order.get('payment_status')) else '#e67e22'}; font-weight: bold;">{order.get('payment_status')}</span>
+                </div>
+            </div>
+
+            <div style="background: #f5f2eb; color: #888; padding: 12px; text-align: center; font-size: 12px; border-top: 1px solid #e8e2d5;">
+                Heena Imitation Jewellery Order Management System
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    subject = f"🔔 New Order #{order.get('order_code')} — Rs. {order.get('total')} — Heena Imitation Jewellery"
+    msg = MIMEMultipart('alternative')
     msg['Subject'] = subject
-    msg['From'] = f"Heena Orders <{smtp_user or 'heenaimitationjewellery06@gmail.com'}>"
+    msg['From'] = f"Heena Orders <{smtp_user}>"
     msg['To'] = ADMIN_EMAIL
+    msg.attach(MIMEText(body_text, 'plain', 'utf-8'))
+    msg.attach(MIMEText(body_html, 'html', 'utf-8'))
 
     sent_success = False
     if smtp_user and smtp_pass:
+        # Try TLS (587) first with timeout
         try:
-            with smtplib.SMTP(smtp_server, smtp_port) as server:
+            if smtp_port == 465:
+                server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10)
+            else:
+                server = smtplib.SMTP(smtp_server, smtp_port, timeout=10)
                 server.starttls()
+            with server:
                 server.login(smtp_user, smtp_pass)
-                server.sendmail(msg['From'], [ADMIN_EMAIL], msg.as_string())
+                server.sendmail(smtp_user, [ADMIN_EMAIL], msg.as_string())
             print(f"[ADMIN ORDER EMAIL SENT] to {ADMIN_EMAIL} for Order #{order.get('order_code')}")
             sent_success = True
-        except Exception as e:
-            print("Admin Order Email SMTP Error:", e)
-            sent_success = False
+        except Exception as e1:
+            # Fallback to SSL (port 465) if TLS failed
+            try:
+                with smtplib.SMTP_SSL(smtp_server, 465, timeout=10) as ssl_server:
+                    ssl_server.login(smtp_user, smtp_pass)
+                    ssl_server.sendmail(smtp_user, [ADMIN_EMAIL], msg.as_string())
+                print(f"[ADMIN ORDER EMAIL SENT (SSL 465)] to {ADMIN_EMAIL} for Order #{order.get('order_code')}")
+                sent_success = True
+            except Exception as e2:
+                print(f"Admin Order Email SMTP Error: TLS={e1}, SSL={e2}")
+                sent_success = False
     else:
         print(f"==================================================")
         print(f"[ADMIN ORDER EMAIL NOTIFICATION] TO: {ADMIN_EMAIL}")
         print(f"SUBJECT: {subject}")
-        try:
-            print(body)
-        except Exception:
-            print(body.encode('ascii', errors='replace').decode('ascii'))
+        print(body_text)
         print(f"==================================================")
         sent_success = True
 
@@ -1586,94 +1662,8 @@ Address: {order.get('shipping_address')}
 
 
 def send_admin_order_whatsapp(order):
-    order_id = order.get('order_id')
-    db = get_db()
-    if order_id:
-        if getattr(g, 'db_type', '') in ('mysql', 'postgres'):
-            cursor = db.cursor()
-            cursor.execute("SELECT whatsapp_notification_sent FROM orders WHERE id = %s", (order_id,))
-            row = cursor.fetchone()
-        else:
-            cursor = db.execute("SELECT whatsapp_notification_sent FROM orders WHERE id = ?", (order_id,))
-            r = cursor.fetchone()
-            row = dict(r) if r else None
-        
-        if row and row.get('whatsapp_notification_sent') == 1:
-            print(f"[DUPLICATE PREVENTED] WhatsApp notification already sent for order #{order.get('order_code')}")
-            return True
-
-    items_bullets = "\n".join([f"• {item.get('name', 'Product')} x {item.get('qty', 1)} — Rs. {item.get('price', 0)*item.get('qty', 1)}" for item in order.get('items', [])])
-    
-    message_text = (
-        f"NEW ORDER RECEIVED\n\n"
-        f"Heena Imitation Jewellery\n\n"
-        f"Order ID: #{order.get('order_code')}\n\n"
-        f"Customer:\n"
-        f"Name: {order.get('customer_name')}\n"
-        f"Email: {order.get('customer_email')}\n"
-        f"Phone: {order.get('customer_phone')}\n\n"
-        f"ORDER ITEMS:\n"
-        f"{items_bullets}\n\n"
-        f"Subtotal: Rs. {order.get('subtotal')}\n"
-        f"Shipping: Rs. {order.get('shipping')}\n"
-        f"Discount: Rs. {order.get('discount')}\n\n"
-        f"TOTAL: Rs. {order.get('total')}\n\n"
-        f"Payment Method:\n"
-        f"{order.get('payment_method')}\n\n"
-        f"Payment Status:\n"
-        f"{order.get('payment_status')}\n\n"
-        f"Delivery Address:\n"
-        f"{order.get('shipping_address')}"
-    )
-
-    print(f"==================================================")
-    print(f"[ADMIN WHATSAPP NOTIFICATION] TO: {ADMIN_WHATSAPP_NUMBER}")
-    try:
-        print(message_text)
-    except Exception:
-        print(message_text.encode('ascii', errors='replace').decode('ascii'))
-    print(f"==================================================")
-
-    sent_success = False
-    if WHATSAPP_API_URL and WHATSAPP_API_TOKEN:
-        try:
-            payload = json.dumps({
-                "messaging_product": "whatsapp",
-                "to": ADMIN_WHATSAPP_NUMBER,
-                "type": "text",
-                "text": {"body": message_text}
-            }).encode('utf-8')
-
-            req = urllib.request.Request(
-                WHATSAPP_API_URL,
-                data=payload,
-                headers={
-                    'Content-Type': 'application/json',
-                    'Authorization': f'Bearer {WHATSAPP_API_TOKEN}'
-                },
-                method='POST'
-            )
-            with urllib.request.urlopen(req) as resp:
-                print(f"[ADMIN WHATSAPP API RESPONSE] status: {resp.status}")
-            sent_success = True
-        except Exception as e:
-            print("Admin WhatsApp API Error:", e)
-            sent_success = False
-    else:
-        sent_success = True
-
-    if sent_success and order_id:
-        try:
-            if getattr(g, 'db_type', '') in ('mysql', 'postgres'):
-                cursor = db.cursor()
-                cursor.execute("UPDATE orders SET whatsapp_notification_sent = 1 WHERE id = %s", (order_id,))
-            else:
-                db.execute("UPDATE orders SET whatsapp_notification_sent = 1 WHERE id = ?", (order_id,))
-                db.commit()
-        except Exception as e:
-            print("Error updating whatsapp_notification_sent:", e)
-
-    return sent_success
+    """WhatsApp order alerts removed as requested. Email notifications used exclusively."""
+    return True
 
 
 @app.route('/api/orders', methods=['POST'])
@@ -1752,9 +1742,8 @@ def create_order():
         'created_at': created_at
     }
 
-    # Trigger admin notifications for EVERY order
+    # Trigger admin email notification for EVERY order
     send_admin_order_email(order_dict)
-    send_admin_order_whatsapp(order_dict)
 
     return jsonify({
         'success': True,
