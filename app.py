@@ -1637,7 +1637,7 @@ Heena Imitation Jewellery Team
     return send_smtp_email(customer_email, subject, body_text, body_html)
 
 def send_cart_reminder_email(user_email, user_name, cart_items, reminder_stage=1):
-    """Sends 24-hour reminder (#1) or final pre-expiry warning (#2) for abandoned carts."""
+    """Sends gentle 24-hour reminder (#1) or humble follow-up (#2) for saved carts."""
     if not user_email or not cart_items:
         return False
 
@@ -1669,17 +1669,17 @@ def send_cart_reminder_email(user_email, user_name, cart_items, reminder_stage=1
     items_table_html = "".join(items_rows_html)
 
     if reminder_stage == 1:
-        subject = f"🛒 Items waiting in your bag — Complete your purchase at Heena Imitation Jewellery"
-        badge_text = "✨ Items Waiting In Your Cart"
-        headline = "Did You Forget Something Beautiful?"
-        message = "We noticed you selected some handcrafted jewellery pieces, but didn't finish checking out. Because our collections are limited in stock, complete your order today before your favorites sell out!"
-        cta_text = "Complete Your Purchase Now"
+        subject = f"✨ Your handcrafted selections are waiting for you — Heena Imitation Jewellery"
+        badge_text = "✨ Saved In Your Bag"
+        headline = "Your Handcrafted Pieces Are Waiting For You"
+        message = "We noticed you selected some beautiful pieces from our collection. Whenever you are ready, your bag is safely saved for you. If you need any assistance with sizes, designs, or styling, our team is always happy to help."
+        cta_text = "View Your Bag"
     else:
-        subject = f"⏳ Final Notice: Your saved cart is expiring today — Heena Imitation Jewellery"
-        badge_text = "⚠️ Reserved Cart Expiring Today"
-        headline = "Final Reminder: Your Cart Is About To Expire"
-        message = "This is your final notice. To release reserved designs for other jewellery lovers, your saved cart will be automatically cleared today. If you would still like to own these pieces, complete your purchase now!"
-        cta_text = "Claim Your Jewellery Before It's Gone"
+        subject = f"🌸 A gentle follow-up regarding your shopping bag — Heena Imitation Jewellery"
+        badge_text = "🌸 A Gentle Follow-Up"
+        headline = "Just Checking In — Your Selections Are Ready"
+        message = "We are just checking in with a gentle note regarding the pieces you loved. We understand that choosing jewellery takes time, and there is never any rush. Whenever you feel ready, your bag is waiting for you. Please let us know if we can assist you in any way."
+        cta_text = "Visit Your Bag"
 
     body_text = f"""HEENA IMITATION JEWELLERS — {headline.upper()}
 
@@ -1692,7 +1692,7 @@ Dear {customer_name},
 
 Total Value: Rs. {total_val:,.2f}
 
-Complete your purchase here: https://heena-imitation-jewellery.netlify.app/
+View your selections here: https://heena-imitation-jewellery.netlify.app/
 
 Support: heenaimitationjewellery06@gmail.com | WhatsApp: +91 9777166165
 """
@@ -1739,11 +1739,11 @@ Support: heenaimitationjewellery06@gmail.com | WhatsApp: +91 9777166165
 
                 <div style="text-align: center; margin: 28px 0 18px 0;">
                     <a href="https://heena-imitation-jewellery.netlify.app/" style="background: linear-gradient(135deg, #d4af37, #b8860b); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 30px; font-weight: bold; font-size: 15px; display: inline-block; box-shadow: 0 4px 12px rgba(184,134,11,0.3);">
-                        👉 {cta_text}
+                        ✨ {cta_text}
                     </a>
                 </div>
-                <p style="text-align: center; font-size: 12px; color: #888; margin-bottom: 0;">
-                    Free shipping & easy cash on delivery available across India.
+                <p style="text-align: center; font-size: 13px; color: #777; margin-bottom: 0;">
+                    Free shipping & Cash on Delivery available across India. We are always here to assist you.
                 </p>
             </div>
 
@@ -1760,8 +1760,8 @@ Support: heenaimitationjewellery06@gmail.com | WhatsApp: +91 9777166165
 
 def process_abandoned_carts_job():
     """Processes abandoned carts:
-       1. Sends Reminder #1 after 24 hours.
-       2. Sends Final Reminder #2 before 72 hours (3 days).
+       1. Sends gentle Reminder #1 after 24 hours.
+       2. Sends humble Follow-up #2 after 48 hours.
        3. Auto-purges records older than 72 hours (max 3 days) to keep database and server lean.
     """
     now = datetime.now()
@@ -1825,10 +1825,10 @@ def process_abandoned_carts_job():
                         db.execute("DELETE FROM abandoned_carts WHERE id = ?", (row_id,))
                         db.commit()
                     results['purged'] += 1
-                    print(f"[CART PURGED] Abandoned cart for {email} deleted automatically after 3 days.")
+                    print(f"[CART PURGED] Inactive cart for {email} safely cleared after 3 days to maintain light database.")
 
-                # Stage 2: Final reminder before 3-day deletion (between 60h and 72h)
-                elif age_hours >= 60 and r2_sent == 0:
+                # Stage 2: Humble follow-up before 3-day deletion (between 48h and 72h)
+                elif age_hours >= 48 and r2_sent == 0:
                     send_cart_reminder_email(email, name, cart_items, reminder_stage=2)
                     if is_pg:
                         cur.execute("UPDATE abandoned_carts SET reminder_2_sent = 1 WHERE id = %s", (row_id,))
