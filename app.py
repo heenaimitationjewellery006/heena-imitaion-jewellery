@@ -1183,6 +1183,12 @@ def customer_logout():
 
 # --- COMPLETELY SEPARATE ADMIN AUTHENTICATION & DASHBOARD ---
 
+@app.route('/admin')
+def admin_root():
+    if session.get('admin_logged_in'):
+        return redirect(url_for('admin_dashboard_page'))
+    return redirect(url_for('admin_login_page'))
+
 @app.route('/admin/login', methods=['GET'])
 def admin_login_page():
     if session.get('admin_logged_in'):
