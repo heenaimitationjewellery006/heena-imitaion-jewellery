@@ -1,15 +1,5 @@
 [build]
-  command = "pip install -r requirements.txt"
   publish = "."
-  functions = "netlify/functions"
-
-[build.environment]
-  PYTHON_VERSION = "3.11"
-  SECRETS_SCAN_ENABLED = "false"
-
-[functions]
-  directory = "netlify/functions"
-  included_files = ["templates/**", "static/**", "database.db"]
 
 # 1. Serve static assets directly (CSS, JS, images, hero slider, uploads)
 [[redirects]]
@@ -33,22 +23,25 @@
   to = "/static/data/reviews.json"
   status = 200
 
-# 3. Route Admin Portal & Admin Authentication to Flask Serverless Function
+# 3. Route Admin Portal & Admin Authentication directly to Render Backend
 [[redirects]]
   from = "/admin"
-  to = "/.netlify/functions/app"
+  to = "https://heena-jewellery-backend.onrender.com/admin"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/admin/*"
-  to = "/.netlify/functions/app"
+  to = "https://heena-jewellery-backend.onrender.com/admin/:splat"
   status = 200
+  force = true
 
-# 4. Route Dynamic APIs (Orders, Checkout, Auth, Admin APIs, Database) to Flask Serverless Function
+# 4. Route Dynamic APIs (Orders, Checkout, Auth, Admin APIs, Database) to Render Backend
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/app"
+  to = "https://heena-jewellery-backend.onrender.com/api/:splat"
   status = 200
+  force = true
 
 # 5. Route all other storefront URLs to index.html
 [[redirects]]

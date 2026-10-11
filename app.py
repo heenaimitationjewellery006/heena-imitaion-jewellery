@@ -39,8 +39,8 @@ app.secret_key = os.environ.get('SECRET_KEY', 'heena_imitation_jewellery_super_s
 # --- Secure Config ---
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
-ADMIN_ID = os.environ.get('ADMIN_ID', 'admin')
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
+ADMIN_ID = os.environ.get('ADMIN_ID', 'heena imitation jewellery')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'HeenaAdmin#2026')
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'heenaimitationjewellery06@gmail.com')
 ADMIN_WHATSAPP_NUMBER = os.environ.get('ADMIN_WHATSAPP_NUMBER', '919777166165')
 WHATSAPP_NUMBER = os.environ.get('WHATSAPP_NUMBER', '919777166165')
@@ -183,29 +183,39 @@ class PostgresConnectionWrapper:
 
 
 def get_postgres_connection():
-    """Establishes connection to Supabase PostgreSQL."""
-    if not POSTGRES_URL:
+    """Establishes connection to Supabase PostgreSQL with automatic IPv4 pooler fallback."""
+    raw_url = os.environ.get('DATABASE_URL') or POSTGRES_URL
+    if not raw_url:
         return None
 
-    url = POSTGRES_URL.strip()
-    if url.startswith('postgres://'):
-        url = 'postgresql://' + url[len('postgres://'):]
+    urls_to_try = [raw_url.strip()]
+
+    # Automatic IPv4 fallback for Render and environments without IPv6 routing
+    if 'db.voazarkrwulwfdqfqgyv.supabase.co' in raw_url:
+        ipv4_url = raw_url.replace(
+            'db.voazarkrwulwfdqfqgyv.supabase.co',
+            'aws-0-ap-northeast-1.pooler.supabase.com'
+        ).replace(
+            'postgres:',
+            'postgres.voazarkrwulwfdqfqgyv:'
+        )
+        urls_to_try.insert(0, ipv4_url)
 
     if HAS_PSYCOPG2:
-        try:
-            if 'sslmode' not in url:
-                sep = '&' if '?' in url else '?'
-                url_ssl = f"{url}{sep}sslmode=require"
-            else:
-                url_ssl = url
-            raw_conn = psycopg2.connect(url_ssl)
-            return PostgresConnectionWrapper(raw_conn)
-        except Exception:
+        for u in urls_to_try:
+            if u.startswith('postgres://'):
+                u = 'postgresql://' + u[len('postgres://'):]
+            sep = '&' if '?' in u else '?'
+            u_ssl = u if 'sslmode' in u else f"{u}{sep}sslmode=require"
             try:
-                raw_conn = psycopg2.connect(url)
+                raw_conn = psycopg2.connect(u_ssl, connect_timeout=6)
                 return PostgresConnectionWrapper(raw_conn)
-            except Exception as e:
-                print(f"Supabase / PostgreSQL connection error (psycopg2): {e}")
+            except Exception:
+                try:
+                    raw_conn = psycopg2.connect(u, connect_timeout=6)
+                    return PostgresConnectionWrapper(raw_conn)
+                except Exception as e:
+                    print(f"PostgreSQL connection attempt note: {e}")
 
     return None
 
@@ -1014,10 +1024,13 @@ def admin_login_api():
     admin_id = (data.get('admin_id') or '').strip()
     password = (data.get('password') or '').strip()
 
+    valid_id = (os.environ.get('ADMIN_ID') or ADMIN_ID or 'heena imitation jewellery').strip()
+    valid_pass = (os.environ.get('ADMIN_PASSWORD') or ADMIN_PASSWORD or 'HeenaAdmin#2026').strip()
+
     # Server-side validation against environment secrets (case-insensitive for Admin ID)
-    if admin_id.lower() == ADMIN_ID.lower() and password == ADMIN_PASSWORD:
+    if admin_id.lower() == valid_id.lower() and password == valid_pass:
         session['admin_logged_in'] = True
-        session['admin_id'] = ADMIN_ID
+        session['admin_id'] = valid_id
         return jsonify({'success': True, 'message': 'Admin authenticated successfully.'})
     
     return jsonify({'success': False, 'message': 'Invalid Admin ID or Password.'}), 401
