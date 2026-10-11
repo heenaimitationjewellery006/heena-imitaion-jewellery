@@ -1,0 +1,37 @@
+{
+  "success": true,
+  "reviews": [
+    {
+      "id": 1,
+      "product_id": 1,
+      "user_name": "Ananya Sharma",
+      "rating": 5,
+      "comment": "Absolutly stunning choker! Received so many compliments at my sister's wedding.",
+      "date": "2026-08-14"
+    },
+    {
+      "id": 2,
+      "product_id": 1,
+      "user_name": "Pooja Patel",
+      "rating": 5,
+      "comment": "High quality gold polish and lightweight! Best purchase from Heena Jewellers.",
+      "date": "2026-09-02"
+    },
+    {
+      "id": 3,
+      "product_id": 4,
+      "user_name": "Meera Joshi",
+      "rating": 5,
+      "comment": "These jhumkas are gorgeous! Pearls look very authentic.",
+      "date": "2026-08-28"
+    },
+    {
+      "id": 4,
+      "product_id": 13,
+      "user_name": "Riddhi Shah",
+      "rating": 5,
+      "comment": "The bridal set looks like real 22k gold! Packaging was super safe.",
+      "date": "2026-09-10"
+    }
+  ]
+}

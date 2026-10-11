@@ -268,9 +268,17 @@ async function loadFeaturedProducts(tab) {
     const res = await fetch(`/api/products?${query}`);
     const data = await res.json();
     if (data.success) {
+      let prods = data.products || [];
+      if (tab === 'bestsellers') {
+        const filtered = prods.filter(p => p.is_best_seller);
+        if (filtered.length > 0) prods = filtered;
+      } else if (tab === 'newarrivals') {
+        const filtered = prods.filter(p => p.is_new_arrival);
+        if (filtered.length > 0) prods = filtered;
+      }
       const container = document.getElementById('featuredProductsContainer');
       if (container) {
-        container.innerHTML = data.products.slice(0, 8).map(p => renderProductCardHTML(p)).join('');
+        container.innerHTML = prods.slice(0, 8).map(p => renderProductCardHTML(p)).join('');
       }
     }
   } catch (err) {
@@ -357,16 +365,25 @@ async function fetchFilteredProducts() {
     const res = await fetch(`/api/products?${params.toString()}`);
     const data = await res.json();
     if (data.success) {
-      state.productsCache = data.products;
+      let prods = data.products || [];
+      if (cat !== 'all') {
+        prods = prods.filter(p => p.category && p.category.toLowerCase() === cat.toLowerCase());
+      }
+      prods = prods.filter(p => p.price <= maxPrice);
+      if (sort === 'price_asc') prods.sort((a,b) => a.price - b.price);
+      else if (sort === 'price_desc') prods.sort((a,b) => b.price - a.price);
+      else if (sort === 'rating') prods.sort((a,b) => b.rating - a.rating);
+
+      state.productsCache = prods;
       const grid = document.getElementById('shopProductsGrid');
       const title = document.getElementById('shopCategoryTitle');
       const count = document.getElementById('shopProductsCount');
 
       if (title) title.textContent = cat === 'all' ? 'All Imitation Jewellery' : cat;
-      if (count) count.textContent = `Showing ${data.products.length} products`;
+      if (count) count.textContent = `Showing ${prods.length} products`;
 
       if (grid) {
-        if (data.products.length === 0) {
+        if (prods.length === 0) {
           grid.innerHTML = `
             <div style="grid-column: 1/-1; text-align: center; padding: 60px 0;">
               <i class="fa-solid fa-gem" style="font-size: 3rem; color: var(--border-color); margin-bottom: 16px;"></i>
@@ -375,7 +392,7 @@ async function fetchFilteredProducts() {
             </div>
           `;
         } else {
-          grid.innerHTML = data.products.map(p => renderProductCardHTML(p)).join('');
+          grid.innerHTML = prods.map(p => renderProductCardHTML(p)).join('');
         }
       }
     }
@@ -423,11 +440,31 @@ function handleLiveSearch(e) {
 }
 
 // --- PDP & Quick View ---
-async function openQuickView(productId) {
+async function getProductById(productId) {
+  let p = (state.productsCache || []).find(item => item.id == productId);
+  if (p) return { product: p, reviews: [] };
   try {
     const res = await fetch(`/api/products/${productId}`);
     const data = await res.json();
-    if (data.success) {
+    if (data.product) return { product: data.product, reviews: data.reviews || [] };
+    if (data.products) {
+      const match = data.products.find(item => item.id == productId);
+      if (match) return { product: match, reviews: [] };
+    }
+  } catch (e) {}
+  try {
+    const res = await fetch('/static/data/products.json');
+    const data = await res.json();
+    const match = (data.products || []).find(item => item.id == productId);
+    if (match) return { product: match, reviews: [] };
+  } catch (e) {}
+  return { product: null, reviews: [] };
+}
+
+async function openQuickView(productId) {
+  try {
+    const data = await getProductById(productId);
+    if (data.product) {
       const content = document.getElementById('quickViewContent');
       if (content) {
         content.innerHTML = renderPDPContentHTML(data.product, data.reviews);
@@ -443,9 +480,8 @@ async function showPDP(productId) {
   closeModal('quickViewModal');
   showPage('pdp-view');
   try {
-    const res = await fetch(`/api/products/${productId}`);
-    const data = await res.json();
-    if (data.success) {
+    const data = await getProductById(productId);
+    if (data.product) {
       const container = document.getElementById('pdpContentContainer');
       if (container) {
         container.innerHTML = renderPDPContentHTML(data.product, data.reviews);

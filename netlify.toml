@@ -15,8 +15,25 @@
   to = "/static/:splat"
   status = 200
 
-# 2. Route all requests to index.html
+# 2. Serve static categories & products data for Netlify frontend
+[[redirects]]
+  from = "/api/categories"
+  to = "/static/data/categories.json"
+  status = 200
+
+[[redirects]]
+  from = "/api/products*"
+  to = "/static/data/products.json"
+  status = 200
+
+[[redirects]]
+  from = "/api/reviews*"
+  to = "/static/data/reviews.json"
+  status = 200
+
+# 3. Route all client pages to index.html
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+

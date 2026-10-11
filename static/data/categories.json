@@ -1,0 +1,61 @@
+{
+  "success": true,
+  "categories": [
+    {
+      "id": 1,
+      "name": "Necklaces",
+      "slug": "necklaces",
+      "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=600&q=80",
+      "description": "Statement, Kundan & Choker Necklaces"
+    },
+    {
+      "id": 2,
+      "name": "Earrings",
+      "slug": "earrings",
+      "image": "https://images.unsplash.com/photo-1630019852942-f89202989a59?auto=format&fit=crop&w=600&q=80",
+      "description": "Jhumkas, Chandbalis & Studs"
+    },
+    {
+      "id": 3,
+      "name": "Pendants",
+      "slug": "pendants",
+      "image": "https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&w=600&q=80",
+      "description": "Minimal & Zircon Pendant Sets"
+    },
+    {
+      "id": 4,
+      "name": "Bracelets",
+      "slug": "bracelets",
+      "image": "https://images.unsplash.com/photo-1611591475140-be38b638edec?auto=format&fit=crop&w=600&q=80",
+      "description": "Antique Gold Cuffs & Bangles"
+    },
+    {
+      "id": 5,
+      "name": "Rings",
+      "slug": "rings",
+      "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?auto=format&fit=crop&w=600&q=80",
+      "description": "Solitaire & Cocktail Statement Rings"
+    },
+    {
+      "id": 6,
+      "name": "Bridal Sets",
+      "slug": "bridal-sets",
+      "image": "/static/images/bridal_spotlight.jpg",
+      "description": "Grand Maharani Bridal Kundan Sets"
+    },
+    {
+      "id": 7,
+      "name": "Clutchers",
+      "slug": "clutchers",
+      "image": "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=600&q=80",
+      "description": "Embellished Hair Accessories & Clutchers"
+    },
+    {
+      "id": 8,
+      "name": "Scrunchies & Garters",
+      "slug": "scrunchies-garters",
+      "image": "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=600&q=80",
+      "description": "Luxury Satin Silk Scrunchies & Hair Garters"
+    }
+  ]
+}
