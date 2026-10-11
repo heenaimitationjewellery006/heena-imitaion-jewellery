@@ -1934,9 +1934,10 @@ def create_order():
     customer = data.get('customer', {})
     subtotal = float(data.get('subtotal', 0))
     discount = float(data.get('discount', 0))
-    tax = round((subtotal - discount) * 0.03, 2)
-    shipping = 0 if subtotal >= 999 else 99
-    total = round(subtotal - discount + tax + shipping, 2)
+    net_subtotal = max(0.0, subtotal - discount)
+    tax = 0.0  # Prices inclusive of all taxes
+    shipping = 40.0 if net_subtotal < 500 else 0.0
+    total = round(net_subtotal + tax + shipping, 2)
     payment_method = data.get('payment_method', 'Razorpay / UPI')
     is_cod = 'COD' in payment_method.upper() or 'CASH ON DELIVERY' in payment_method.upper()
     payment_status = 'Pending (COD)' if is_cod else 'Paid'

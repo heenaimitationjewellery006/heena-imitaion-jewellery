@@ -606,7 +606,7 @@ function renderCartDrawer() {
   `).join('');
 
   const subtotal = state.cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-  const freeShipGap = Math.max(0, 999 - subtotal);
+  const freeShipGap = Math.max(0, 500 - subtotal);
 
   footer.innerHTML = `
     ${freeShipGap > 0 ? `<p style="font-size: 0.8rem; color: var(--brand-maroon); font-weight: 600; text-align: center; margin-bottom: 10px;">Add ₹${freeShipGap} more for FREE Delivery!</p>` : `<p style="font-size: 0.8rem; color: #27AE60; font-weight: 700; text-align: center; margin-bottom: 10px;">🎉 FREE Delivery Unlocked!</p>`}
@@ -707,9 +707,10 @@ function renderCheckoutPage() {
 
   const subtotal = state.cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
   const discount = state.activeCoupon ? state.activeCoupon.discount_amount : 0;
-  const tax = roundVal((subtotal - discount) * 0.03);
-  const shipping = subtotal >= 999 ? 0 : 99;
-  const total = roundVal(subtotal - discount + tax + shipping);
+  const netSubtotal = Math.max(0, subtotal - discount);
+  const shipping = netSubtotal < 500 ? 40 : 0;
+  const tax = 0; // Prices inclusive of all taxes
+  const total = roundVal(netSubtotal + tax + shipping);
 
   if (state.user) {
     const emailEl = document.getElementById('chkEmail');
@@ -728,8 +729,8 @@ function renderCheckoutPage() {
   totalsContainer.innerHTML = `
     <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 6px;"><span>Subtotal</span><span>₹${subtotal.toLocaleString('en-IN')}</span></div>
     ${discount > 0 ? `<div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #27AE60; margin-bottom: 6px;"><span>Coupon Discount</span><span>-₹${discount}</span></div>` : ''}
-    <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 6px;"><span>GST (3%)</span><span>₹${tax}</span></div>
-    <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 6px;"><span>Express Shipping</span><span>${shipping === 0 ? 'FREE' : '₹' + shipping}</span></div>
+    <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 6px;"><span>Delivery Charge</span><span>${shipping === 0 ? '<strong style="color: #27AE60;">FREE</strong>' : '₹' + shipping}</span></div>
+    <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: #64748B; margin-bottom: 6px;"><span>GST / Taxes</span><span>Included in Price</span></div>
     <div class="cart-total-row" style="display: flex; justify-content: space-between;"><span>Total Payable</span><span>₹${total.toLocaleString('en-IN')}</span></div>
   `;
 }
@@ -745,9 +746,10 @@ function handleProceedToPayment(event) {
 
   const subtotal = state.cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
   const discount = state.activeCoupon ? state.activeCoupon.discount_amount : 0;
-  const tax = roundVal((subtotal - discount) * 0.03);
-  const shipping = subtotal >= 999 ? 0 : 99;
-  const total = roundVal(subtotal - discount + tax + shipping);
+  const netSubtotal = Math.max(0, subtotal - discount);
+  const shipping = netSubtotal < 500 ? 40 : 0;
+  const tax = 0;
+  const total = roundVal(netSubtotal + tax + shipping);
 
   document.getElementById('rzpTotalAmount').textContent = `₹${total.toLocaleString('en-IN')}`;
   
@@ -1429,4 +1431,71 @@ function closeModal(modalId) {
 
 function roundVal(num) {
   return Math.round((num + Number.EPSILON) * 100) / 100;
+}
+
+function openPolicyModal(type) {
+  const titleEl = document.getElementById('policyModalTitle');
+  const bodyEl = document.getElementById('policyModalBody');
+  if (!titleEl || !bodyEl) return;
+
+  const policies = {
+    shipping: {
+      title: 'Shipping & Delivery Policy',
+      content: `
+        <h4 style="color: var(--brand-maroon); margin-top: 0;">1. Delivery Charges</h4>
+        <p>• <strong>Orders of ₹500 and above:</strong> 100% FREE Express Delivery across India.</p>
+        <p>• <strong>Orders below ₹500:</strong> A standard delivery charge of ₹40 applies per order.</p>
+
+        <h4 style="color: var(--brand-maroon); margin-top: 16px;">2. Dispatch & Delivery Timelines</h4>
+        <p>All handcrafted jewellery orders are packaged securely with bubble protection and dispatched within <strong>24 to 48 business hours</strong>. Delivery typically takes <strong>3 to 7 business days</strong> depending on your destination city/state across India.</p>
+
+        <h4 style="color: var(--brand-maroon); margin-top: 16px;">3. Order Tracking</h4>
+        <p>Once your order is handed over to our courier partner (Delhivery / Blue Dart / India Post), you will receive automated shipping and tracking updates via email and WhatsApp.</p>
+      `
+    },
+    refund: {
+      title: 'Returns & Refund Policy',
+      content: `
+        <h4 style="color: var(--brand-maroon); margin-top: 0;">1. 7-Day Hassle-Free Replacement / Return</h4>
+        <p>At Heena Imitation Jewellery, customer satisfaction is our prime commitment. If you receive an item that is defective, transit-damaged, or incorrect, you can request a return or replacement within <strong>7 days</strong> of delivery.</p>
+
+        <h4 style="color: var(--brand-maroon); margin-top: 16px;">2. Reporting Damaged Items</h4>
+        <p>Please share a brief unboxing video or photographs of the damaged product with your Order ID via WhatsApp at <strong>+91 9777166165</strong> or email us at <strong>heenaimitationjewellery06@gmail.com</strong>.</p>
+
+        <h4 style="color: var(--brand-maroon); margin-top: 16px;">3. Refund Process & Timelines</h4>
+        <p>Once your return is inspected and approved, refunds are credited back to the original payment source (Bank / UPI / Card) within <strong>3 to 5 business days</strong>. For COD orders, refund is issued directly via UPI/Bank transfer.</p>
+      `
+    },
+    terms: {
+      title: 'Terms & Conditions',
+      content: `
+        <h4 style="color: var(--brand-maroon); margin-top: 0;">1. Introduction & Ownership</h4>
+        <p>Welcome to Heena Imitation Jewellery. By browsing our website and placing orders, you agree to comply with our terms and conditions.</p>
+
+        <h4 style="color: var(--brand-maroon); margin-top: 16px;">2. Pricing & Product Descriptions</h4>
+        <p>All prices are listed in Indian Rupees (INR) and are inclusive of all applicable taxes. We strive to provide accurate photographs of handcrafted imitation jewellery; subtle color tone variations may occur due to photographic lighting.</p>
+
+        <h4 style="color: var(--brand-maroon); margin-top: 16px;">3. Secure Orders & Payments</h4>
+        <p>Payments on our store are secured via 256-bit SSL encryption. We reserve the right to cancel orders in unforeseen circumstances such as stock discrepancies or inaccurate shipping addresses, with immediate full refund.</p>
+      `
+    },
+    privacy: {
+      title: 'Privacy Policy',
+      content: `
+        <h4 style="color: var(--brand-maroon); margin-top: 0;">1. Customer Data Protection</h4>
+        <p>Heena Imitation Jewellery respects your privacy. We only collect essential customer information (Name, Email, Delivery Address, Phone Number) strictly necessary for order delivery and customer support.</p>
+
+        <h4 style="color: var(--brand-maroon); margin-top: 16px;">2. Non-Disclosure & Security</h4>
+        <p>We do not sell, rent, or trade your personal information to any third parties. All sensitive transaction data is encrypted and handled securely through RBI-compliant payment processing partners.</p>
+
+        <h4 style="color: var(--brand-maroon); margin-top: 16px;">3. Contact Support</h4>
+        <p>If you have any questions about your data, feel free to contact us at <strong>heenaimitationjewellery06@gmail.com</strong>.</p>
+      `
+    }
+  };
+
+  const selected = policies[type] || policies.shipping;
+  titleEl.textContent = selected.title;
+  bodyEl.innerHTML = selected.content;
+  openModal('policyModal');
 }

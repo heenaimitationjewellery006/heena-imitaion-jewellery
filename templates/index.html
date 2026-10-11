@@ -19,7 +19,7 @@
 
   <!-- Announcement Top Bar -->
   <div class="announcement-bar">
-    <span>✨ FESTIVE SALE: Flat 10% OFF with Code <strong>HEENA10</strong> | Free Express Shipping on Orders Above ₹999 | Customer Support WhatsApp: <strong>9777166165</strong> ✨</span>
+    <span>✨ FESTIVE SALE: Flat 10% OFF with Code <strong>HEENA10</strong> | Free Delivery on Orders Above ₹500 (₹40 below ₹500) | WhatsApp: <strong>9777166165</strong> ✨</span>
   </div>
 
   <!-- Main Header & Navigation -->
@@ -523,6 +523,22 @@
     </div>
   </div>
 
+  <!-- POLICY MODAL (Mandatory for Razorpay Live Compliance) -->
+  <div class="modal-backdrop" id="policyModal">
+    <div style="background: #ffffff; border-radius: 12px; max-width: 650px; width: 92%; max-height: 85vh; overflow-y: auto; padding: 28px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); position: relative; border: 1px solid var(--accent-gold);">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-color); padding-bottom: 12px; margin-bottom: 18px;">
+        <h3 id="policyModalTitle" style="color: var(--brand-maroon); font-family: var(--font-heading); font-size: 1.4rem; margin: 0;">Policy</h3>
+        <button onclick="closeModal('policyModal')" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #888;">&times;</button>
+      </div>
+      <div id="policyModalBody" style="font-size: 0.95rem; line-height: 1.7; color: #333;">
+        <!-- Populated dynamically via openPolicyModal(type) -->
+      </div>
+      <div style="text-align: right; margin-top: 24px; border-top: 1px solid #eee; padding-top: 14px;">
+        <button class="btn-gold" onclick="closeModal('policyModal')" style="padding: 8px 24px;">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Floating WhatsApp Widget -->
   <a href="https://wa.me/919777166165?text=Hello%20Heena%20Imitation%20Jewellery,%20I%20have%20an%20inquiry." target="_blank" class="floating-whatsapp" title="Chat on WhatsApp (9777166165)">
     <i class="fa-brands fa-whatsapp"></i>
@@ -534,30 +550,40 @@
 
   <!-- Footer -->
   <footer style="background-color: var(--brand-maroon); color: #FFF8F0; padding: 60px 0 24px 0; margin-top: 80px;">
-    <div class="container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 40px; margin-bottom: 40px;">
+    <div class="container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 32px; margin-bottom: 40px;">
       <div>
         <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
           <img src="/static/images/logo.png" alt="Heena Logo" style="height: 52px; width: 52px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-gold); background: #FFF; padding: 2px;">
           <div style="font-family: var(--font-heading); font-size: 1.8rem; font-weight: 700; color: var(--accent-gold);">HEENA</div>
         </div>
-        <p style="font-size: 0.9rem; color: #E8D5C8; line-height: 1.6;">Heena Imitation Jewellery - Premier online boutique for trendy, elegant, and affordable imitation jewellery.</p>
+        <p style="font-size: 0.9rem; color: #E8D5C8; line-height: 1.6;">Heena Imitation Jewellery - Premier online boutique for trendy, elegant, and affordable handcrafted imitation jewellery across India.</p>
       </div>
       <div>
         <h4 style="font-size: 1.1rem; color: var(--accent-gold); margin-bottom: 16px;">Quick Links</h4>
         <ul style="list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 0.9rem;">
-          <li><a href="#" onclick="showPage('shop-view')">Shop All Jewellery</a></li>
-          <li><a href="#" onclick="filterByCategory('Bridal Sets')">Bridal Sets Spotlight</a></li>
-          <li><a href="#" onclick="showPage('about-view')">About Our Brand</a></li>
+          <li><a href="#" onclick="showPage('shop-view')" style="color: #E8D5C8; text-decoration: none;">Shop All Jewellery</a></li>
+          <li><a href="#" onclick="filterByCategory('Bridal Sets')" style="color: #E8D5C8; text-decoration: none;">Bridal Sets Spotlight</a></li>
+          <li><a href="#" onclick="showPage('about-view')" style="color: #E8D5C8; text-decoration: none;">About Our Brand</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 style="font-size: 1.1rem; color: var(--accent-gold); margin-bottom: 16px;">Policies & Legal</h4>
+        <ul style="list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 0.9rem;">
+          <li><a href="javascript:void(0)" onclick="openPolicyModal('shipping')" style="color: #E8D5C8; text-decoration: none;">Shipping & Delivery</a></li>
+          <li><a href="javascript:void(0)" onclick="openPolicyModal('refund')" style="color: #E8D5C8; text-decoration: none;">Returns & Refund Policy</a></li>
+          <li><a href="javascript:void(0)" onclick="openPolicyModal('terms')" style="color: #E8D5C8; text-decoration: none;">Terms & Conditions</a></li>
+          <li><a href="javascript:void(0)" onclick="openPolicyModal('privacy')" style="color: #E8D5C8; text-decoration: none;">Privacy Policy</a></li>
         </ul>
       </div>
       <div>
         <h4 style="font-size: 1.1rem; color: var(--accent-gold); margin-bottom: 16px;">Customer Support</h4>
         <p style="font-size: 0.9rem; color: #E8D5C8; margin-bottom: 8px;"><i class="fa-solid fa-envelope" style="color: var(--accent-gold);"></i> Email: <strong>heenaimitationjewellery06@gmail.com</strong></p>
         <p style="font-size: 0.9rem; color: #E8D5C8;"><i class="fa-brands fa-whatsapp" style="color: #25D366;"></i> WhatsApp: <strong>9777166165</strong></p>
+        <p style="font-size: 0.85rem; color: #D6C2B4; margin-top: 8px;"><i class="fa-solid fa-location-dot" style="color: var(--accent-gold);"></i> Gujarat, India</p>
       </div>
     </div>
     <div style="border-top: 1px solid rgba(255,255,255,0.15); padding-top: 20px; text-align: center; font-size: 0.85rem; color: #D6C2B4;">
-      © 2026 Heena Imitation Jewellery. All Rights Reserved.
+      © 2026 Heena Imitation Jewellery. All Rights Reserved. All Prices Inclusive of GST.
     </div>
   </footer>
 
