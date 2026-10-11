@@ -1,0 +1,8 @@
+/static/*  /static/:splat  200
+/api/categories  /static/data/categories.json  200
+/api/products  /static/data/products.json  200
+/api/reviews  /static/data/reviews.json  200
+/admin  https://heena-jewellery-backend.onrender.com/admin  200!
+/admin/*  https://heena-jewellery-backend.onrender.com/admin/:splat  200!
+/api/*  https://heena-jewellery-backend.onrender.com/api/:splat  200!
+/*  /index.html  200
