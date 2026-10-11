@@ -15,25 +15,41 @@
   to = "/static/:splat"
   status = 200
 
-# 2. Serve static categories & products data for Netlify frontend
+# 2. Fast static cache for public catalog & categories
 [[redirects]]
   from = "/api/categories"
   to = "/static/data/categories.json"
   status = 200
 
 [[redirects]]
-  from = "/api/products*"
+  from = "/api/products"
   to = "/static/data/products.json"
   status = 200
 
 [[redirects]]
-  from = "/api/reviews*"
+  from = "/api/reviews"
   to = "/static/data/reviews.json"
   status = 200
 
-# 3. Route all client pages to index.html
+# 3. Route Admin Portal & Admin Authentication to Flask Serverless Function
+[[redirects]]
+  from = "/admin"
+  to = "/.netlify/functions/app"
+  status = 200
+
+[[redirects]]
+  from = "/admin/*"
+  to = "/.netlify/functions/app"
+  status = 200
+
+# 4. Route Dynamic APIs (Orders, Checkout, Auth, Admin APIs, Database) to Flask Serverless Function
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/app"
+  status = 200
+
+# 5. Route all other storefront URLs to index.html
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-
