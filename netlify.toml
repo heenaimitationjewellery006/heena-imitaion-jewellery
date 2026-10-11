@@ -4,6 +4,8 @@
 
 [build.environment]
   PYTHON_VERSION = "3.11"
+  # Admin email and WhatsApp number are public contact details shown on the storefront
+  SECRETS_SCAN_OMIT_KEYS = "ADMIN_EMAIL,ADMIN_WHATSAPP_NUMBER"
 
 [functions]
   included_files = ["templates/**", "static/**", "database.db"]
