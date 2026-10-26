@@ -1,6 +1,6 @@
 {
   "success": true,
-  "count": 51,
+  "count": 52,
   "products": [
     {
       "id": 1,
@@ -1063,6 +1063,27 @@
       "review_count": 1,
       "image": "https://voazarkrwulwfdqfqgyv.supabase.co/storage/v1/object/public/product/20261026_090458_Black1_-_Copy.jpg",
       "hover_image": "https://voazarkrwulwfdqfqgyv.supabase.co/storage/v1/object/public/product/20261026_090503_Black2_-_Copy_-_Copy.jpg",
+      "description": "",
+      "specs": "{\"Material\": \"Alloy\", \"Occasion\": \"Festive\"}",
+      "is_best_seller": 1,
+      "is_new_arrival": 1,
+      "is_bridal": 0,
+      "color": "Gold",
+      "material": "Brass",
+      "occasion": "Festive",
+      "stock": 25
+    },
+    {
+      "id": 52,
+      "name": "jod",
+      "category": "Earrings",
+      "price": 334.0,
+      "original_price": 3344.0,
+      "discount_percent": 90,
+      "rating": 5.0,
+      "review_count": 1,
+      "image": "https://voazarkrwulwfdqfqgyv.supabase.co/storage/v1/object/public/product/20261026_113600_Blue3.jpg",
+      "hover_image": "https://voazarkrwulwfdqfqgyv.supabase.co/storage/v1/object/public/product/20261026_113605_Brown.jpg",
       "description": "",
       "specs": "{\"Material\": \"Alloy\", \"Occasion\": \"Festive\"}",
       "is_best_seller": 1,

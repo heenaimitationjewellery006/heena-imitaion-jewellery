@@ -155,7 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
     checkCurrentCustomerUser();
     updateBadges();
     loadCategories();
-    loadFeaturedProducts('bestsellers');
+    loadFeaturedProducts('newarrivals');
     fetchFilteredProducts();
   } catch (err) {
     console.error('App init warning:', err);
@@ -407,13 +407,15 @@ async function loadFeaturedProducts(tab) {
     if (tab === 'bestsellers') {
       const filtered = prods.filter(p => p.is_best_seller);
       if (filtered.length > 0) prods = filtered;
+      prods.sort((a, b) => b.id - a.id);
     } else if (tab === 'newarrivals') {
       const filtered = prods.filter(p => p.is_new_arrival);
       if (filtered.length > 0) prods = filtered;
+      prods.sort((a, b) => b.id - a.id);
     }
     const container = document.getElementById('featuredProductsContainer');
     if (container) {
-      container.innerHTML = prods.slice(0, 8).map(p => renderProductCardHTML(p)).join('');
+      container.innerHTML = prods.slice(0, 12).map(p => renderProductCardHTML(p)).join('');
     }
   } catch (err) {
     console.error(err);
@@ -423,10 +425,12 @@ async function loadFeaturedProducts(tab) {
 function renderProductCardHTML(p) {
   const isWishlisted = state.wishlist.includes(p.id);
   const starsHTML = Array(5).fill(0).map((_, i) => `<i class="fa-solid fa-star${i < Math.floor(p.rating) ? '' : '-half-stroke'}"></i>`).join('');
+  const isNew = Boolean(p.is_new_arrival);
 
   return `
     <div class="product-card">
-      <span class="badge-discount">-${p.discount_percent}% OFF</span>
+      ${isNew ? '<span style="position: absolute; top: 12px; left: 12px; background: #C9A15C; color: #161618; font-size: 0.72rem; font-weight: 800; padding: 3px 8px; border-radius: 4px; z-index: 2; letter-spacing: 0.05em; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">NEW</span>' : ''}
+      <span class="badge-discount" style="${isNew ? 'top: 38px;' : ''}">-${p.discount_percent}% OFF</span>
       <button class="wishlist-toggle-btn ${isWishlisted ? 'active' : ''}" onclick="toggleWishlist(${p.id}, event)">
         <i class="fa-${isWishlisted ? 'solid' : 'regular'} fa-heart"></i>
       </button>
