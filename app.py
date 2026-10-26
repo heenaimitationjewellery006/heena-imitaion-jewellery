@@ -1323,6 +1323,41 @@ def add_product():
             db.commit()
             last_id = cursor.lastrowid
 
+        # Sync static products.json backup so fallback cache stays 100% in sync
+        try:
+            static_json_path = os.path.join(BASE_DIR, 'static', 'data', 'products.json')
+            if os.path.exists(static_json_path):
+                with open(static_json_path, 'r', encoding='utf-8') as f:
+                    cached_data = json.load(f)
+                if isinstance(cached_data, dict) and 'products' in cached_data:
+                    new_item = {
+                        'id': last_id,
+                        'name': name,
+                        'category': category,
+                        'price': price,
+                        'original_price': original_price,
+                        'discount_percent': discount_percent,
+                        'rating': 5.0,
+                        'review_count': 1,
+                        'image': image,
+                        'hover_image': hover_image,
+                        'description': description,
+                        'specs': specs,
+                        'is_best_seller': 1,
+                        'is_new_arrival': 1,
+                        'is_bridal': is_bridal,
+                        'color': color,
+                        'material': material,
+                        'occasion': occasion,
+                        'stock': stock
+                    }
+                    cached_data['products'].insert(0, new_item)
+                    cached_data['count'] = len(cached_data['products'])
+                    with open(static_json_path, 'w', encoding='utf-8') as f:
+                        json.dump(cached_data, f, indent=2)
+        except Exception as e:
+            print(f"Sync static products.json on add error: {e}")
+
         return jsonify({'success': True, 'product_id': last_id, 'message': f"Product '{name}' added successfully!"})
     except Exception as e:
         return jsonify({'success': False, 'message': f"Database error while saving product: {str(e)}"}), 500
@@ -1353,6 +1388,21 @@ def delete_product(product_id):
     else:
         db.execute("DELETE FROM products WHERE id = ?", (product_id,))
         db.commit()
+
+    # Sync static products.json backup so deleted items never revive
+    try:
+        static_json_path = os.path.join(BASE_DIR, 'static', 'data', 'products.json')
+        if os.path.exists(static_json_path):
+            with open(static_json_path, 'r', encoding='utf-8') as f:
+                cached_data = json.load(f)
+            if isinstance(cached_data, dict) and 'products' in cached_data:
+                cached_data['products'] = [p for p in cached_data['products'] if p.get('id') != product_id]
+                cached_data['count'] = len(cached_data['products'])
+                with open(static_json_path, 'w', encoding='utf-8') as f:
+                    json.dump(cached_data, f, indent=2)
+    except Exception as e:
+        print(f"Sync static products.json on delete error: {e}")
+
     return jsonify({'success': True, 'message': 'Product deleted successfully!'})
 
 @app.route('/api/categories', methods=['GET'])
