@@ -359,8 +359,8 @@
             <input type="text" id="chkName" required placeholder="Ananya Sharma" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-top: 6px;">
           </div>
           <div style="margin-bottom: 16px;">
-            <label style="font-size: 0.85rem; font-weight: 600;">Verified Account Email *</label>
-            <input type="email" id="chkEmail" required readonly placeholder="ananya@example.com" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-top: 6px; background-color: var(--bg-secondary);">
+            <label style="font-size: 0.85rem; font-weight: 600;">Email Address (for Order Invoice & Tracking) *</label>
+            <input type="email" id="chkEmail" required placeholder="ananya@example.com" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-top: 6px;">
           </div>
           <div style="margin-bottom: 16px;">
             <label style="font-size: 0.85rem; font-weight: 600;">Phone Number (for Order Updates & Delivery) *</label>
@@ -524,7 +524,7 @@
         <div style="font-size: 0.8rem; color: #475569; margin-bottom: 10px;">UPI ID: <strong>9777166165@ybl</strong></div>
       </div>
 
-      <button class="btn-gold" style="width: 100%; background-color: #3399FF; font-size: 1rem; border-radius: var(--radius-sm);" onclick="executeRazorpayPayment()">
+      <button id="btnCompletePayment" class="btn-gold" style="width: 100%; background-color: #3399FF; font-size: 1rem; border-radius: var(--radius-sm);" onclick="executeRazorpayPayment()">
         Complete Payment & Place Order <i class="fa-solid fa-shield-halved"></i>
       </button>
       <button style="width: 100%; margin-top: 10px; font-size: 0.85rem; color: #64748B;" onclick="closeModal('razorpayModal')">Cancel Payment</button>

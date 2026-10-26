@@ -857,13 +857,8 @@ async function applyPromoCode() {
   }
 }
 
-// --- Customer Checkout Authorization ---
+// --- Customer Checkout Flow ---
 function checkCheckoutAuth() {
-  if (!state.user || !state.user.is_logged_in) {
-    showToast('Please log in with passwordless Email OTP before placing an order', 'warning');
-    openAuthModal();
-    return;
-  }
   renderCheckoutPage();
 }
 
@@ -882,7 +877,7 @@ function renderCheckoutPage() {
   if (state.user) {
     const emailEl = document.getElementById('chkEmail');
     const nameEl = document.getElementById('chkName');
-    if (emailEl) emailEl.value = state.user.email || '';
+    if (emailEl && !emailEl.value) emailEl.value = state.user.email || '';
     if (nameEl && !nameEl.value) nameEl.value = state.user.name || '';
   }
 
@@ -905,9 +900,23 @@ function renderCheckoutPage() {
 function handleProceedToPayment(event) {
   event.preventDefault();
 
-  if (!state.user || !state.user.is_logged_in) {
-    showToast('Please sign in to your account to proceed to payment!', 'warning');
-    openAuthModal();
+  if (!state.cart || state.cart.length === 0) {
+    showToast('Your shopping bag is empty!', 'warning');
+    return;
+  }
+
+  const email = (document.getElementById('chkEmail')?.value || '').trim();
+  const name = (document.getElementById('chkName')?.value || '').trim();
+  const phone = (document.getElementById('chkPhone')?.value || '').trim();
+  const address = (document.getElementById('chkAddress')?.value || '').trim();
+
+  if (!email) {
+    showToast('Please enter your email to receive your invoice and order receipt.', 'warning');
+    document.getElementById('chkEmail')?.focus();
+    return;
+  }
+  if (!name || !phone || !address) {
+    showToast('Please complete your shipping address details.', 'warning');
     return;
   }
 
@@ -941,18 +950,37 @@ function selectPayOption(method) {
 
 async function executeRazorpayPayment() {
   const phoneEl = document.getElementById('chkPhone');
+  const emailEl = document.getElementById('chkEmail');
+  const nameEl = document.getElementById('chkName');
+  const addrEl = document.getElementById('chkAddress');
+  const cityEl = document.getElementById('chkCity');
+  const stateEl = document.getElementById('chkState');
+  const pinEl = document.getElementById('chkPincode');
+
   const customer = {
-    name: document.getElementById('chkName').value,
-    email: document.getElementById('chkEmail').value,
+    name: nameEl ? nameEl.value.trim() : (state.user?.name || 'Customer'),
+    email: emailEl ? emailEl.value.trim() : (state.user?.email || ''),
     phone: phoneEl ? phoneEl.value.trim() : '9777166165',
-    address: document.getElementById('chkAddress').value,
-    city: document.getElementById('chkCity').value,
-    state: document.getElementById('chkState').value,
-    pincode: document.getElementById('chkPincode').value
+    address: addrEl ? addrEl.value.trim() : '',
+    city: cityEl ? cityEl.value.trim() : '',
+    state: stateEl ? stateEl.value.trim() : '',
+    pincode: pinEl ? pinEl.value.trim() : ''
   };
+
+  if (!customer.email) {
+    showToast('Email address is required for sending your order receipt.', 'error');
+    return;
+  }
 
   const subtotal = state.cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
   const discount = state.activeCoupon ? state.activeCoupon.discount_amount : 0;
+
+  const btn = document.getElementById('btnCompletePayment');
+  const origBtnText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Processing Secure Order...`;
+  }
 
   try {
     const res = await fetch('/api/orders', {
@@ -963,7 +991,7 @@ async function executeRazorpayPayment() {
         items: state.cart,
         subtotal: subtotal,
         discount: discount,
-        payment_method: state.selectedPayMethod.toUpperCase()
+        payment_method: (state.selectedPayMethod || 'UPI').toUpperCase()
       })
     });
     const data = await res.json();
@@ -972,16 +1000,23 @@ async function executeRazorpayPayment() {
       state.cart = [];
       state.activeCoupon = null;
       localStorage.removeItem('hjm_coupon');
+      localStorage.removeItem('hjm_cart');
       updateBadges();
 
       renderOrderConfirmation(data);
       showPage('order-success-view');
       showToast('Order Placed Successfully!', 'success');
     } else {
-      showToast(data.message, 'error');
+      showToast(data.message || 'Payment processing error', 'error');
     }
   } catch (err) {
-    showToast('Order creation failed', 'error');
+    console.error('Order creation error:', err);
+    showToast('Failed to complete order. Please try again.', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origBtnText;
+    }
   }
 }
 
@@ -989,14 +1024,18 @@ function renderOrderConfirmation(data) {
   const container = document.getElementById('orderSuccessContainer');
   if (!container) return;
 
+  const totalAmount = Number(data.total || (data.order && data.order.total) || 0);
+  const orderCode = data.order_code || (data.order && data.order.order_code) || 'HJM-ORDER';
+  const payStatus = data.payment_status || (data.order && data.order.payment_status) || 'Paid';
+
   container.innerHTML = `
     <i class="fa-solid fa-circle-check" style="font-size: 4rem; color: #27AE60; margin-bottom: 16px;"></i>
     <h2 class="serif-font" style="font-size: 2.2rem; color: var(--brand-maroon);">Order Confirmed!</h2>
     <p style="color: var(--text-muted); font-size: 1.05rem; margin-bottom: 24px;">Thank you for shopping with ${state.shopName}.</p>
 
     <div style="background-color: var(--bg-secondary); padding: 20px; border-radius: var(--radius-md); text-align: left; margin-bottom: 24px;">
-      <div style="display: flex; justify-content: space-between; margin-bottom: 8px;"><strong>Order ID:</strong><span style="font-weight: 700; color: var(--accent-gold);">${data.order_code}</span></div>
-      <div style="display: flex; justify-content: space-between; margin-bottom: 8px;"><strong>Total Amount:</strong><span>₹${data.total.toLocaleString('en-IN')} (${data.payment_status || 'Paid'})</span></div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 8px;"><strong>Order ID:</strong><span style="font-weight: 700; color: var(--accent-gold);">${orderCode}</span></div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 8px;"><strong>Total Amount:</strong><span>₹${totalAmount.toLocaleString('en-IN')} (${payStatus})</span></div>
       <div style="display: flex; justify-content: space-between;"><strong>Estimated Delivery:</strong><span>3-5 Business Days</span></div>
     </div>
 
@@ -1009,8 +1048,8 @@ function renderOrderConfirmation(data) {
 
     <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
       <button class="btn-gold" onclick="showPage('shop-view')">Continue Shopping</button>
-      <button class="btn-gold btn-outline-gold" onclick="viewOrderInvoice('${data.order_code}')"><i class="fa-solid fa-file-invoice"></i> View / Print Invoice</button>
-      <button class="btn-gold" style="background-color: #25D366; color: white;" onclick="shareOrderOnWhatsApp('${data.order_code}', ${data.total})"><i class="fa-brands fa-whatsapp"></i> Share on WhatsApp</button>
+      <button class="btn-gold btn-outline-gold" onclick="viewOrderInvoice('${orderCode}')"><i class="fa-solid fa-file-invoice"></i> View / Print Invoice</button>
+      <button class="btn-gold" style="background-color: #25D366; color: white;" onclick="shareOrderOnWhatsApp('${orderCode}', ${totalAmount})"><i class="fa-brands fa-whatsapp"></i> Share on WhatsApp</button>
     </div>
   `;
 }

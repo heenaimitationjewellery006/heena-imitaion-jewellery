@@ -1346,6 +1346,15 @@ def validate_coupon():
         'message': f"Coupon '{code}' applied successfully!"
     })
 
+def run_in_app_context(func, *args, **kwargs):
+    def wrapper():
+        with app.app_context():
+            try:
+                func(*args, **kwargs)
+            except Exception as e:
+                print(f"Background task {getattr(func, '__name__', 'func')} note: {e}")
+    threading.Thread(target=wrapper).start()
+
 def send_smtp_email(to_email, subject, body_text, body_html):
     """Robust SMTP sender with Dual TLS (587) and SSL (465) fallback and 10s timeout."""
     smtp_server = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
@@ -1353,9 +1362,10 @@ def send_smtp_email(to_email, subject, body_text, body_html):
     smtp_user = (os.environ.get('SMTP_USER') or '').strip() or ADMIN_EMAIL
     smtp_pass = (os.environ.get('SMTP_PASSWORD') or '').strip().replace(' ', '')
 
+    from email.header import Header
     msg = MIMEMultipart('alternative')
-    msg['Subject'] = subject
-    msg['From'] = f"Heena Imitation Jewellery <{smtp_user}>"
+    msg['Subject'] = Header(subject, 'utf-8').encode()
+    msg['From'] = Header(f"Heena Imitation Jewellery <{smtp_user}>", 'utf-8').encode()
     msg['To'] = to_email
     msg.attach(MIMEText(body_text, 'plain', 'utf-8'))
     msg.attach(MIMEText(body_html, 'html', 'utf-8'))
@@ -1370,20 +1380,20 @@ def send_smtp_email(to_email, subject, body_text, body_html):
             with server:
                 server.login(smtp_user, smtp_pass)
                 server.sendmail(smtp_user, [to_email], msg.as_string())
-            print(f"[EMAIL SENT] to {to_email} | Subject: {subject}")
+            print(f"[EMAIL SENT] to {to_email}")
             return True
         except Exception as e1:
             try:
                 with smtplib.SMTP_SSL(smtp_server, 465, timeout=10) as ssl_server:
                     ssl_server.login(smtp_user, smtp_pass)
                     ssl_server.sendmail(smtp_user, [to_email], msg.as_string())
-                print(f"[EMAIL SENT (SSL 465)] to {to_email} | Subject: {subject}")
+                print(f"[EMAIL SENT (SSL 465)] to {to_email}")
                 return True
             except Exception as e2:
-                print(f"SMTP send failed to {to_email}: TLS={e1}, SSL={e2}")
+                print(f"SMTP send failed to {to_email}")
                 return False
     else:
-        print(f"[DEV CONSOLE EMAIL] to {to_email}: {subject}")
+        print(f"[DEV CONSOLE EMAIL] to {to_email}")
         return True
 
 def send_admin_order_email(order):
@@ -1973,12 +1983,16 @@ def trigger_cart_reminders():
 
 @app.route('/api/orders', methods=['POST'])
 def create_order():
-    if not session.get('user_email'):
-        return jsonify({'success': False, 'message': 'Please log in to place an order.'}), 401
-
     data = request.json or {}
-    items = data.get('items', [])
     customer = data.get('customer', {})
+    customer_email = (session.get('user_email') or customer.get('email') or '').strip()
+    if not customer_email:
+        return jsonify({'success': False, 'message': 'Customer email address is required to place an order.'}), 400
+
+    items = data.get('items', [])
+    if not items:
+        return jsonify({'success': False, 'message': 'Your shopping bag is empty.'}), 400
+
     subtotal = float(data.get('subtotal', 0))
     discount = float(data.get('discount', 0))
     net_subtotal = max(0.0, subtotal - discount)
@@ -1993,10 +2007,13 @@ def create_order():
     created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     db = get_db()
-    customer_name = customer.get('name', session.get('user_name', 'Customer'))
-    customer_email = session['user_email']
-    customer_phone = customer.get('phone', '9777166165')
-    shipping_address = f"{customer.get('address', '')}, {customer.get('city', '')}, {customer.get('state', '')} - {customer.get('pincode', '')}"
+    customer_name = (customer.get('name') or session.get('user_name') or customer_email.split('@')[0]).strip()
+    customer_phone = (customer.get('phone') or '9777166165').strip()
+    shipping_address = f"{customer.get('address', '')}, {customer.get('city', '')}, {customer.get('state', '')} - {customer.get('pincode', '')}".strip(" ,-")
+
+    # Remember customer in session
+    session['user_email'] = customer_email
+    session['user_name'] = customer_name
 
     if getattr(g, 'db_type', '') in ('mysql', 'postgres'):
         cursor = db.cursor()
@@ -2048,11 +2065,11 @@ def create_order():
         'created_at': created_at
     }
 
-    # 1. Trigger admin email notification for EVERY order
-    send_admin_order_email(order_dict)
+    # 1. Trigger admin email notification for EVERY order in background thread
+    run_in_app_context(send_admin_order_email, order_dict)
 
-    # 2. Trigger customer tax invoice and Thank You email directly to customer
-    send_customer_order_invoice_email(order_dict)
+    # 2. Trigger customer tax invoice and Thank You email directly to customer in background thread
+    run_in_app_context(send_customer_order_invoice_email, order_dict)
 
     # 3. Clean up customer's abandoned cart entry from database upon completed checkout
     try:
@@ -2075,7 +2092,7 @@ def create_order():
 
 @app.route('/api/orders', methods=['GET'])
 def get_orders():
-    email = session.get('user_email')
+    email = session.get('user_email') or request.args.get('email')
     db = get_db()
     if getattr(g, 'db_type', '') in ('mysql', 'postgres'):
         cursor = db.cursor()
