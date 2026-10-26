@@ -378,6 +378,48 @@
       "material": "Brass",
       "occasion": "Bridal",
       "stock": 22
+    },
+    {
+      "category": "Earrings",
+      "color": "Gold",
+      "description": "DN WDAH DKNAW DJWDA JBJFD",
+      "discount_percent": 90,
+      "hover_image": "/static/uploads/20261026_090246_2.jpg",
+      "id": 20,
+      "image": "/static/uploads/20261026_090234_1.jpg",
+      "is_best_seller": 1,
+      "is_bridal": 0,
+      "is_new_arrival": 1,
+      "material": "Brass",
+      "name": "AND AD",
+      "occasion": "Festive",
+      "original_price": 1313.0,
+      "price": 123.0,
+      "rating": 5.0,
+      "review_count": 1,
+      "specs": "{\"Material\": \"Alloy\", \"Occasion\": \"Festive\"}",
+      "stock": 1
+    },
+    {
+      "category": "Bracelets",
+      "color": "Gold",
+      "description": "",
+      "discount_percent": 25,
+      "hover_image": "/static/uploads/20261026_090503_Black2_-_Copy_-_Copy.jpg",
+      "id": 21,
+      "image": "/static/uploads/20261026_090458_Black1_-_Copy.jpg",
+      "is_best_seller": 1,
+      "is_bridal": 0,
+      "is_new_arrival": 1,
+      "material": "Brass",
+      "name": "d and a",
+      "occasion": "Festive",
+      "original_price": 3122.0,
+      "price": 2341.0,
+      "rating": 5.0,
+      "review_count": 1,
+      "specs": "{\"Material\": \"Alloy\", \"Occasion\": \"Festive\"}",
+      "stock": 25
     }
   ]
 }
