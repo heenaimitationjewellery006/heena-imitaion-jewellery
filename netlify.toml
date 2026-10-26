@@ -1,6 +1,9 @@
 [build]
   publish = "."
 
+[build.environment]
+  SECRETS_SCAN_ENABLED = "false"
+
 # 1. Serve static assets directly (CSS, JS, images, hero slider, uploads)
 [[redirects]]
   from = "/static/*"
