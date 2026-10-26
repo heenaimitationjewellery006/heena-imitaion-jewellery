@@ -16,6 +16,136 @@ const state = {
   selectedPayMethod: 'upi'
 };
 
+// --- Supabase Cloud Database Configuration (Shared with Render Backend) ---
+const SUPABASE_CONFIG = {
+  url: 'https://voazarkrwulwfdqfqgyv.supabase.co',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZvYXphcmtyd3Vsd2ZkcWZxZ3l2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2MjIzMDUsImV4cCI6MjEwNzE5ODMwNX0.WhjIl1EwTlPHVMwpawTXU0CAz4b4X0AJSyMgCwz1Eys'
+};
+
+function normalizeProduct(p) {
+  if (!p) return null;
+  let specs = p.specs;
+  if (typeof specs === 'string') {
+    try { specs = JSON.parse(specs); } catch (e) { specs = {}; }
+  }
+  return {
+    ...p,
+    id: Number(p.id),
+    price: Number(p.price || 0),
+    original_price: Number(p.original_price || p.price || 0),
+    discount_percent: Number(p.discount_percent || 0),
+    rating: Number(p.rating || 4.8),
+    review_count: Number(p.review_count || 12),
+    stock: Number(p.stock !== undefined ? p.stock : 25),
+    is_best_seller: Number(p.is_best_seller || 0),
+    is_new_arrival: Number(p.is_new_arrival || 0),
+    is_bridal: Number(p.is_bridal || 0),
+    specs: specs || {}
+  };
+}
+
+let catalogFetchPromise = null;
+
+async function getLiveCatalogProducts(forceRefresh = false) {
+  if (!forceRefresh && state.productsCache && state.productsCache.length > 0) {
+    return state.productsCache;
+  }
+  if (catalogFetchPromise && !forceRefresh) {
+    return catalogFetchPromise;
+  }
+
+  catalogFetchPromise = (async () => {
+    // 1. Try Live Supabase Cloud Database (Direct Global Edge CDN)
+    try {
+      const resp = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/products?select=*&order=id.asc`, {
+        headers: {
+          'apikey': SUPABASE_CONFIG.anonKey,
+          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+        }
+      });
+      if (resp.ok) {
+        const rows = await resp.json();
+        if (Array.isArray(rows) && rows.length > 0) {
+          const list = rows.map(normalizeProduct);
+          state.productsCache = list;
+          return list;
+        }
+      }
+    } catch (err) {
+      console.warn('Supabase cloud fetch notice, falling back:', err);
+    }
+
+    // 2. Try Backend API
+    try {
+      const res = await fetch('/api/products');
+      const data = await res.json();
+      const rawList = Array.isArray(data) ? data : (data.products || []);
+      if (rawList.length > 0) {
+        const list = rawList.map(normalizeProduct);
+        state.productsCache = list;
+        return list;
+      }
+    } catch (e) {}
+
+    // 3. Resilient Static JSON Cache
+    try {
+      const res = await fetch('/static/data/products.json');
+      const data = await res.json();
+      const rawList = Array.isArray(data) ? data : (data.products || []);
+      if (rawList.length > 0) {
+        const list = rawList.map(normalizeProduct);
+        state.productsCache = list;
+        return list;
+      }
+    } catch (e) {}
+
+    return state.productsCache || [];
+  })();
+
+  try {
+    const res = await catalogFetchPromise;
+    return res;
+  } finally {
+    catalogFetchPromise = null;
+  }
+}
+
+async function getLiveCategories() {
+  // 1. Live Supabase Cloud Categories
+  try {
+    const resp = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/categories?select=*&order=id.asc`, {
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+      }
+    });
+    if (resp.ok) {
+      const rows = await resp.json();
+      if (Array.isArray(rows) && rows.length > 0) return rows;
+    }
+  } catch (err) {
+    console.warn('Supabase categories fetch notice:', err);
+  }
+
+  // 2. Try Backend API
+  try {
+    const res = await fetch('/api/categories');
+    const data = await res.json();
+    const list = Array.isArray(data) ? data : (data.categories || []);
+    if (list.length > 0) return list;
+  } catch (e) {}
+
+  // 3. Fallback to static JSON
+  try {
+    const res = await fetch('/static/data/categories.json');
+    const data = await res.json();
+    const list = Array.isArray(data) ? data : (data.categories || []);
+    if (list.length > 0) return list;
+  } catch (e) {}
+
+  return [];
+}
+
 // --- Initializer ---
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
@@ -241,12 +371,11 @@ function updateBadges() {
 // --- Category Grid ---
 async function loadCategories() {
   try {
-    const res = await fetch('/api/categories');
-    const data = await res.json();
-    if (data.success) {
+    const categories = await getLiveCategories();
+    if (categories && categories.length > 0) {
       const container = document.getElementById('categoryGridContainer');
       if (container) {
-        container.innerHTML = data.categories.map(c => `
+        container.innerHTML = categories.map(c => `
           <div class="category-card" onclick="filterByCategory('${c.name}')">
             <div class="category-thumb-wrapper">
               <img src="${c.image}" class="category-thumb-img" alt="${c.name}">
@@ -272,23 +401,19 @@ async function loadFeaturedProducts(tab) {
     btnNew.style.color = tab === 'newarrivals' ? '#FFF' : 'var(--accent-gold)';
   }
 
-  const query = tab === 'bestsellers' ? 'best_seller=1' : 'new_arrival=1';
   try {
-    const res = await fetch(`/api/products?${query}`);
-    const data = await res.json();
-    if (data.success) {
-      let prods = data.products || [];
-      if (tab === 'bestsellers') {
-        const filtered = prods.filter(p => p.is_best_seller);
-        if (filtered.length > 0) prods = filtered;
-      } else if (tab === 'newarrivals') {
-        const filtered = prods.filter(p => p.is_new_arrival);
-        if (filtered.length > 0) prods = filtered;
-      }
-      const container = document.getElementById('featuredProductsContainer');
-      if (container) {
-        container.innerHTML = prods.slice(0, 8).map(p => renderProductCardHTML(p)).join('');
-      }
+    const allProducts = await getLiveCatalogProducts();
+    let prods = allProducts.slice();
+    if (tab === 'bestsellers') {
+      const filtered = prods.filter(p => p.is_best_seller);
+      if (filtered.length > 0) prods = filtered;
+    } else if (tab === 'newarrivals') {
+      const filtered = prods.filter(p => p.is_new_arrival);
+      if (filtered.length > 0) prods = filtered;
+    }
+    const container = document.getElementById('featuredProductsContainer');
+    if (container) {
+      container.innerHTML = prods.slice(0, 8).map(p => renderProductCardHTML(p)).join('');
     }
   } catch (err) {
     console.error(err);
@@ -361,48 +486,42 @@ function resetFilters() {
 
 async function fetchFilteredProducts() {
   const cat = document.querySelector('input[name="filterCategory"]:checked')?.value || 'all';
-  const maxPrice = document.getElementById('priceRange')?.value || 6000;
+  const maxPrice = parseFloat(document.getElementById('priceRange')?.value || 6000);
   const sort = document.getElementById('sortSelect')?.value || 'popularity';
 
-  const params = new URLSearchParams({
-    category: cat,
-    max_price: maxPrice,
-    sort: sort
-  });
-
   try {
-    const res = await fetch(`/api/products?${params.toString()}`);
-    const data = await res.json();
-    if (data.success) {
-      let prods = data.products || [];
-      if (cat !== 'all') {
-        prods = prods.filter(p => p.category && p.category.toLowerCase() === cat.toLowerCase());
-      }
-      prods = prods.filter(p => p.price <= maxPrice);
-      if (sort === 'price_asc') prods.sort((a,b) => a.price - b.price);
-      else if (sort === 'price_desc') prods.sort((a,b) => b.price - a.price);
-      else if (sort === 'rating') prods.sort((a,b) => b.rating - a.rating);
+    const allProducts = await getLiveCatalogProducts();
+    let prods = allProducts.slice();
+    if (cat !== 'all') {
+      prods = prods.filter(p => p.category && p.category.toLowerCase() === cat.toLowerCase());
+    }
+    prods = prods.filter(p => p.price <= maxPrice);
 
-      state.productsCache = prods;
-      const grid = document.getElementById('shopProductsGrid');
-      const title = document.getElementById('shopCategoryTitle');
-      const count = document.getElementById('shopProductsCount');
+    if (sort === 'price_asc' || sort === 'price-low') prods.sort((a,b) => a.price - b.price);
+    else if (sort === 'price_desc' || sort === 'price-high') prods.sort((a,b) => b.price - a.price);
+    else if (sort === 'rating') prods.sort((a,b) => b.rating - a.rating);
+    else if (sort === 'newest') prods.sort((a,b) => (b.is_new_arrival - a.is_new_arrival) || (b.id - a.id));
+    else prods.sort((a,b) => (b.is_best_seller - a.is_best_seller) || (b.rating - a.rating));
 
-      if (title) title.textContent = cat === 'all' ? 'All Imitation Jewellery' : cat;
-      if (count) count.textContent = `Showing ${prods.length} products`;
+    state.productsCache = allProducts;
+    const grid = document.getElementById('shopProductsGrid');
+    const title = document.getElementById('shopCategoryTitle');
+    const count = document.getElementById('shopProductsCount');
 
-      if (grid) {
-        if (prods.length === 0) {
-          grid.innerHTML = `
-            <div style="grid-column: 1/-1; text-align: center; padding: 60px 0;">
-              <i class="fa-solid fa-gem" style="font-size: 3rem; color: var(--border-color); margin-bottom: 16px;"></i>
-              <h3 style="font-size: 1.4rem;">No matching jewellery found</h3>
-              <button class="btn-gold" onclick="resetFilters()">Reset Filters</button>
-            </div>
-          `;
-        } else {
-          grid.innerHTML = prods.map(p => renderProductCardHTML(p)).join('');
-        }
+    if (title) title.textContent = cat === 'all' ? 'All Imitation Jewellery' : cat;
+    if (count) count.textContent = `Showing ${prods.length} products`;
+
+    if (grid) {
+      if (prods.length === 0) {
+        grid.innerHTML = `
+          <div style="grid-column: 1/-1; text-align: center; padding: 60px 0;">
+            <i class="fa-solid fa-gem" style="font-size: 3rem; color: var(--border-color); margin-bottom: 16px;"></i>
+            <h3 style="font-size: 1.4rem;">No matching jewellery found</h3>
+            <button class="btn-gold" onclick="resetFilters()">Reset Filters</button>
+          </div>
+        `;
+      } else {
+        grid.innerHTML = prods.map(p => renderProductCardHTML(p)).join('');
       }
     }
   } catch (err) {
@@ -425,10 +544,15 @@ function handleLiveSearch(e) {
 
   searchDebounceTimer = setTimeout(async () => {
     try {
-      const res = await fetch(`/api/products?search=${encodeURIComponent(query)}`);
-      const data = await res.json();
-      if (data.success && data.products.length > 0) {
-        dropdown.innerHTML = data.products.slice(0, 5).map(p => `
+      const allProducts = await getLiveCatalogProducts();
+      const term = query.toLowerCase();
+      const matches = allProducts.filter(p =>
+        (p.name && p.name.toLowerCase().includes(term)) ||
+        (p.category && p.category.toLowerCase().includes(term)) ||
+        (p.description && p.description.toLowerCase().includes(term))
+      );
+      if (matches.length > 0) {
+        dropdown.innerHTML = matches.slice(0, 5).map(p => `
           <div class="search-item" onclick="showPDP(${p.id}); document.getElementById('searchResultsDropdown').classList.remove('active');">
             <img src="${p.image}" alt="${p.name}">
             <div>
@@ -450,22 +574,17 @@ function handleLiveSearch(e) {
 
 // --- PDP & Quick View ---
 async function getProductById(productId) {
-  let p = (state.productsCache || []).find(item => item.id == productId);
-  if (p) return { product: p, reviews: [] };
+  const allProducts = await getLiveCatalogProducts();
+  const match = allProducts.find(item => item.id == productId);
+  if (match) return { product: match, reviews: [] };
   try {
     const res = await fetch(`/api/products/${productId}`);
     const data = await res.json();
-    if (data.product) return { product: data.product, reviews: data.reviews || [] };
+    if (data.product) return { product: normalizeProduct(data.product), reviews: data.reviews || [] };
     if (data.products) {
-      const match = data.products.find(item => item.id == productId);
-      if (match) return { product: match, reviews: [] };
+      const p = data.products.find(item => item.id == productId);
+      if (p) return { product: normalizeProduct(p), reviews: [] };
     }
-  } catch (e) {}
-  try {
-    const res = await fetch('/static/data/products.json');
-    const data = await res.json();
-    const match = (data.products || []).find(item => item.id == productId);
-    if (match) return { product: match, reviews: [] };
   } catch (e) {}
   return { product: null, reviews: [] };
 }
@@ -573,11 +692,10 @@ function adjustPdpQty(delta) {
 
 // --- Cart Engine ---
 async function addToCart(productId, qty = 1) {
-  let product = state.productsCache.find(p => p.id === productId);
+  let product = (state.productsCache || []).find(p => p.id === productId);
   if (!product) {
-    const res = await fetch(`/api/products/${productId}`);
-    const data = await res.json();
-    if (data.success) product = data.product;
+    const data = await getProductById(productId);
+    product = data?.product;
   }
   if (!product) return;
 
