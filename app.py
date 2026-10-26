@@ -37,6 +37,8 @@ app = Flask(
     static_folder=os.path.join(BASE_DIR, 'static')
 )
 app.secret_key = os.environ.get('SECRET_KEY', 'heena_imitation_jewellery_super_secret_key_2026')
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # --- Secure Config ---
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
@@ -78,7 +80,7 @@ if not SQLITE_DB:
         SQLITE_DB = os.path.join('/tmp', 'database.db')
 
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif', 'heic', 'heif', 'jfif', 'bmp'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 try:
@@ -267,11 +269,23 @@ def internal_error(error):
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not session.get('admin_logged_in'):
-            if request.path.startswith('/api/') or request.path.startswith('/admin/api/'):
-                return jsonify({'success': False, 'message': 'Unauthorized admin access denied'}), 401
-            return redirect(url_for('admin_login_page'))
-        return f(*args, **kwargs)
+        if session.get('admin_logged_in'):
+            return f(*args, **kwargs)
+
+        # Robust mobile fallback: inspect Authorization header if cookies dropped on tab backgrounding
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header.split('Bearer ', 1)[1].strip()
+            valid_pass = (os.environ.get('ADMIN_PASSWORD') or ADMIN_PASSWORD or 'HeenaAdmin#2026').strip()
+            if token == valid_pass or token in ('HeenaAdmin', 'HeenaAdmin#2026'):
+                session.permanent = True
+                session['admin_logged_in'] = True
+                session['admin_id'] = (os.environ.get('ADMIN_ID') or ADMIN_ID or 'heena imitation jewellery').strip()
+                return f(*args, **kwargs)
+
+        if request.path.startswith('/api/') or request.path.startswith('/admin/api/'):
+            return jsonify({'success': False, 'message': 'Admin session expired. Please re-login.'}), 401
+        return redirect(url_for('admin_login_page'))
     return decorated_function
 
 def init_db():
@@ -1035,9 +1049,10 @@ def admin_login_api():
     # Server-side validation against environment secrets (case-insensitive for Admin ID, compatible with password variants)
     is_valid_pass = (password == valid_pass or password in ('HeenaAdmin', 'HeenaAdmin#2026'))
     if admin_id.lower() == valid_id.lower() and is_valid_pass:
+        session.permanent = True
         session['admin_logged_in'] = True
         session['admin_id'] = valid_id
-        return jsonify({'success': True, 'message': 'Admin authenticated successfully.'})
+        return jsonify({'success': True, 'token': password, 'message': 'Admin authenticated successfully.'})
     
     return jsonify({'success': False, 'message': 'Invalid Admin ID or Password.'}), 401
 
@@ -1209,68 +1224,108 @@ def upload_file_to_supabase_storage(filename, local_filepath):
 @admin_required
 def upload_image():
     if 'image' not in request.files:
-        return jsonify({'success': False, 'message': 'No image file provided'}), 400
+        return jsonify({'success': False, 'message': 'No image file received from device'}), 400
     
     file = request.files['image']
-    if file.filename == '':
-        return jsonify({'success': False, 'message': 'No selected file'}), 400
+    if not file or file.filename == '':
+        return jsonify({'success': False, 'message': 'No file selected'}), 400
 
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
+    filename_lower = (file.filename or '').lower()
+    ext = filename_lower.rsplit('.', 1)[-1] if '.' in filename_lower else ''
+
+    if allowed_file(file.filename) or ext in ('jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'jfif', 'bmp'):
+        target_ext = 'jpg' if ext in ('heic', 'heif', 'jfif', '') else ext
+        clean_base = secure_filename(file.filename.rsplit('.', 1)[0]) if '.' in file.filename else secure_filename(file.filename)
+        if not clean_base:
+            clean_base = "phone_upload"
+        
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-        saved_filename = timestamp + filename
+        saved_filename = f"{timestamp}{clean_base}.{target_ext}"
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], saved_filename)
-        file.save(filepath)
+        try:
+            file.save(filepath)
+        except Exception as e:
+            return jsonify({'success': False, 'message': f'Failed to write photo to server storage: {str(e)}'}), 500
         
         # Upload to Supabase Storage for permanent global CDN hosting
         cloud_url = upload_file_to_supabase_storage(saved_filename, filepath)
-        image_url = cloud_url or f"/static/uploads/{saved_filename}"
+        host_prefix = request.host_url.rstrip('/')
+        image_url = cloud_url or f"{host_prefix}/static/uploads/{saved_filename}"
         return jsonify({'success': True, 'image_url': image_url})
 
-    return jsonify({'success': False, 'message': 'Invalid image format.'}), 400
+    return jsonify({'success': False, 'message': f'Unsupported image format ({ext}). Please use JPG, PNG, or WEBP.'}), 400
 
 @app.route('/api/products', methods=['POST'])
 @admin_required
 def add_product():
     data = request.json or {}
-    name = data.get('name')
-    category = data.get('category')
-    price = float(data.get('price', 0))
-    original_price = float(data.get('original_price', price * 1.4))
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'success': False, 'message': 'Product Title is required.'}), 400
+
+    category = (data.get('category') or 'Necklaces').strip()
+
+    try:
+        raw_price = data.get('price')
+        price = float(raw_price) if raw_price is not None and str(raw_price).strip() != '' else 0.0
+    except (ValueError, TypeError):
+        price = 0.0
+
+    try:
+        raw_orig = data.get('original_price')
+        original_price = float(raw_orig) if raw_orig is not None and str(raw_orig).strip() != '' else round(price * 1.4, 2)
+    except (ValueError, TypeError):
+        original_price = round(price * 1.4, 2)
+
+    if original_price < price:
+        original_price = price
+
     discount_percent = int(((original_price - price) / original_price) * 100) if original_price > 0 else 0
-    image = data.get('image', 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=800&q=80')
-    hover_image = data.get('hover_image', image)
-    description = data.get('description', '')
-    specs = json.dumps(data.get('specs', {"Material": "Alloy", "Occasion": "Festive"}))
-    color = data.get('color', 'Gold')
-    material = data.get('material', 'Brass')
-    occasion = data.get('occasion', 'Festive')
-    stock = int(data.get('stock', 25))
+    image = (data.get('image') or '').strip()
+    if not image:
+        image = 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=800&q=80'
+    hover_image = (data.get('hover_image') or '').strip() or image
+    description = (data.get('description') or '').strip()
+    specs = json.dumps(data.get('specs') or {"Material": "Alloy", "Occasion": "Festive"})
+    color = (data.get('color') or 'Gold').strip()
+    material = (data.get('material') or 'Brass').strip()
+    occasion = (data.get('occasion') or 'Festive').strip()
+
+    try:
+        raw_stock = data.get('stock')
+        stock = int(raw_stock) if raw_stock is not None and str(raw_stock).strip() != '' else 25
+    except (ValueError, TypeError):
+        stock = 25
+
     is_bridal = 1 if category == 'Bridal Sets' or data.get('is_bridal') else 0
 
-    db = get_db()
-    if getattr(g, 'db_type', '') in ('mysql', 'postgres'):
-        cursor = db.cursor()
-        cursor.execute('''
-            INSERT INTO products (
-                name, category, price, original_price, discount_percent, rating, review_count,
-                image, hover_image, description, specs, is_best_seller, is_new_arrival,
-                is_bridal, color, material, occasion, stock
-            ) VALUES (%s, %s, %s, %s, %s, 5.0, 1, %s, %s, %s, %s, 1, 1, %s, %s, %s, %s, %s)
-        ''', (name, category, price, original_price, discount_percent, image, hover_image, description, specs, is_bridal, color, material, occasion, stock))
-        last_id = cursor.lastrowid
-    else:
-        cursor = db.execute('''
-            INSERT INTO products (
-                name, category, price, original_price, discount_percent, rating, review_count,
-                image, hover_image, description, specs, is_best_seller, is_new_arrival,
-                is_bridal, color, material, occasion, stock
-            ) VALUES (?, ?, ?, ?, ?, 5.0, 1, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?)
-        ''', (name, category, price, original_price, discount_percent, image, hover_image, description, specs, is_bridal, color, material, occasion, stock))
-        db.commit()
-        last_id = cursor.lastrowid
+    try:
+        db = get_db()
+        if getattr(g, 'db_type', '') in ('mysql', 'postgres'):
+            cursor = db.cursor()
+            cursor.execute('''
+                INSERT INTO products (
+                    name, category, price, original_price, discount_percent, rating, review_count,
+                    image, hover_image, description, specs, is_best_seller, is_new_arrival,
+                    is_bridal, color, material, occasion, stock
+                ) VALUES (%s, %s, %s, %s, %s, 5.0, 1, %s, %s, %s, %s, 1, 1, %s, %s, %s, %s, %s)
+            ''', (name, category, price, original_price, discount_percent, image, hover_image, description, specs, is_bridal, color, material, occasion, stock))
+            last_id = getattr(cursor, 'lastrowid', None)
+        else:
+            cursor = db.execute('''
+                INSERT INTO products (
+                    name, category, price, original_price, discount_percent, rating, review_count,
+                    image, hover_image, description, specs, is_best_seller, is_new_arrival,
+                    is_bridal, color, material, occasion, stock
+                ) VALUES (?, ?, ?, ?, ?, 5.0, 1, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?)
+            ''', (name, category, price, original_price, discount_percent, image, hover_image, description, specs, is_bridal, color, material, occasion, stock))
+            db.commit()
+            last_id = cursor.lastrowid
 
-    return jsonify({'success': True, 'product_id': last_id, 'message': f"Product '{name}' added successfully!"})
+        return jsonify({'success': True, 'product_id': last_id, 'message': f"Product '{name}' added successfully!"})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f"Database error while saving product: {str(e)}"}), 500
 
 @app.route('/api/products/<int:product_id>/stock', methods=['PUT'])
 @admin_required

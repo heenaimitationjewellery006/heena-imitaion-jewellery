@@ -133,6 +133,7 @@
         });
         const data = await res.json();
         if (data.success) {
+          localStorage.setItem('admin_token', data.token || password);
           window.location.href = '/admin/dashboard';
         } else {
           errBox.textContent = data.message || 'Invalid Admin ID or Password.';
