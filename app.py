@@ -49,6 +49,11 @@ ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'heenaimitationjewellery06@gmail.com
 ADMIN_WHATSAPP_NUMBER = os.environ.get('ADMIN_WHATSAPP_NUMBER', '919777166165')
 WHATSAPP_NUMBER = os.environ.get('WHATSAPP_NUMBER', '919777166165')
 
+DEFAULT_SMTP_SERVER = 'smtp.gmail.com'
+DEFAULT_SMTP_PORT = 587
+DEFAULT_SMTP_USER = 'heenaimitationjewellery06@gmail.com'
+DEFAULT_SMTP_PASS = 'ikedrxohgnetiulr'
+
 # --- Supabase / PostgreSQL Config (Netlify Extension & Production) ---
 DEFAULT_SUPABASE_POSTGRES = "postgresql://postgres.voazarkrwulwfdqfqgyv:Mdsaad%402410@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres"
 
@@ -1462,10 +1467,13 @@ def run_in_app_context(func, *args, **kwargs):
 
 def send_smtp_email(to_email, subject, body_text, body_html):
     """Robust SMTP sender with Dual TLS (587) and SSL (465) fallback and 10s timeout."""
-    smtp_server = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
-    smtp_port = int(os.environ.get('SMTP_PORT', 587))
-    smtp_user = (os.environ.get('SMTP_USER') or '').strip() or ADMIN_EMAIL
-    smtp_pass = (os.environ.get('SMTP_PASSWORD') or '').strip().replace(' ', '')
+    smtp_server = (os.environ.get('SMTP_SERVER') or DEFAULT_SMTP_SERVER).strip()
+    try:
+        smtp_port = int(os.environ.get('SMTP_PORT', DEFAULT_SMTP_PORT))
+    except Exception:
+        smtp_port = 587
+    smtp_user = (os.environ.get('SMTP_USER') or '').strip() or os.environ.get('ADMIN_EMAIL') or DEFAULT_SMTP_USER
+    smtp_pass = (os.environ.get('SMTP_PASSWORD') or '').strip().replace(' ', '') or DEFAULT_SMTP_PASS
 
     from email.header import Header
     msg = MIMEMultipart('alternative')
@@ -1485,7 +1493,7 @@ def send_smtp_email(to_email, subject, body_text, body_html):
             with server:
                 server.login(smtp_user, smtp_pass)
                 server.sendmail(smtp_user, [to_email], msg.as_string())
-            print(f"[EMAIL SENT] to {to_email}")
+            print(f"[EMAIL SENT (TLS)] to {to_email}")
             return True
         except Exception as e1:
             try:
@@ -1495,16 +1503,16 @@ def send_smtp_email(to_email, subject, body_text, body_html):
                 print(f"[EMAIL SENT (SSL 465)] to {to_email}")
                 return True
             except Exception as e2:
-                print(f"SMTP send failed to {to_email}")
+                print(f"SMTP send failed to {to_email}: {e1} / {e2}")
                 return False
     else:
-        print(f"[DEV CONSOLE EMAIL] to {to_email}")
-        return True
+        print(f"[ERROR: SMTP credentials missing] cannot send to {to_email}")
+        return False
 
-def send_admin_order_email(order):
-    order_id = order.get('order_id')
+def send_admin_order_email(order, force=False):
+    order_id = order.get('order_id') or order.get('id')
     db = get_db()
-    if order_id:
+    if order_id and not force:
         if getattr(g, 'db_type', '') in ('mysql', 'postgres'):
             cursor = db.cursor()
             cursor.execute("SELECT email_notification_sent FROM orders WHERE id = %s", (order_id,))
@@ -1624,6 +1632,12 @@ Payment Status: {order.get('payment_status')}
 
     subject = f"🔔 New Order #{order.get('order_code')} — Rs. {order.get('total')} — Heena Imitation Jewellery"
     sent = send_smtp_email(ADMIN_EMAIL, subject, body_text, body_html)
+
+    # Also notify backup admin email if configured
+    backup_email = (os.environ.get('BACKUP_ADMIN_EMAIL') or 'mdsaad22410@gmail.com').strip()
+    if backup_email and backup_email.lower() != ADMIN_EMAIL.lower():
+        send_smtp_email(backup_email, subject, body_text, body_html)
+
     if sent and order_id:
         try:
             if getattr(g, 'db_type', '') in ('mysql', 'postgres'):
@@ -2281,6 +2295,64 @@ def update_order_status(order_id):
         db.execute("UPDATE orders SET order_status = ? WHERE id = ?", (new_status, order_id))
         db.commit()
     return jsonify({'success': True, 'message': f'Order status updated to {new_status}'})
+
+@app.route('/api/orders/<int:order_id>/send-email', methods=['POST'])
+@admin_required
+def resend_order_email(order_id):
+    db = get_db()
+    if getattr(g, 'db_type', '') in ('mysql', 'postgres'):
+        cursor = db.cursor()
+        cursor.execute("SELECT * FROM orders WHERE id = %s", (order_id,))
+        order = cursor.fetchone()
+    else:
+        cursor = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,))
+        r = cursor.fetchone()
+        order = dict(r) if r else None
+
+    if not order:
+        return jsonify({'success': False, 'message': 'Order not found'}), 404
+
+    order_dict = dict(order)
+    order_dict['total'] = float(order_dict.get('total', 0))
+    order_dict['subtotal'] = float(order_dict.get('subtotal', 0))
+    order_dict['shipping'] = float(order_dict.get('shipping', 0))
+    order_dict['discount'] = float(order_dict.get('discount', 0))
+
+    if isinstance(order_dict.get('items_json'), str):
+        try:
+            order_dict['items'] = json.loads(order_dict['items_json'])
+        except Exception:
+            order_dict['items'] = []
+
+    admin_sent = send_admin_order_email(order_dict, force=True)
+    cust_sent = send_customer_order_invoice_email(order_dict)
+
+    return jsonify({
+        'success': True,
+        'message': f"Emails dispatched for Order #{order_dict.get('order_code')}! (Admin Alert: {'Sent' if admin_sent else 'Check SMTP'}, Customer Invoice: {'Sent' if cust_sent else 'Check SMTP'})"
+    })
+
+@app.route('/api/admin/test-email', methods=['POST'])
+@admin_required
+def test_admin_email():
+    test_subject = "🔔 Test Order Email Alert — Heena Imitation Jewellery"
+    test_text = "This is a test notification confirming that email delivery is active and working properly!"
+    test_html = """
+    <div style="font-family: Arial, sans-serif; padding: 20px; background: #faf8f5; border: 1px solid #d4af37; border-radius: 8px;">
+        <h2 style="color: #b8860b;">✅ Order Email Notification Test</h2>
+        <p>This email confirms that your Heena Imitation Jewellery email notification system is properly connected and delivering emails reliably.</p>
+        <p><strong>Configured Sender:</strong> heenaimitationjewellery06@gmail.com</p>
+    </div>
+    """
+    sent = send_smtp_email(ADMIN_EMAIL, test_subject, test_text, test_html)
+    backup_email = (os.environ.get('BACKUP_ADMIN_EMAIL') or 'mdsaad22410@gmail.com').strip()
+    if backup_email and backup_email.lower() != ADMIN_EMAIL.lower():
+        send_smtp_email(backup_email, test_subject, test_text, test_html)
+
+    if sent:
+        return jsonify({'success': True, 'message': f'Test email delivered successfully to {ADMIN_EMAIL}!'})
+    else:
+        return jsonify({'success': False, 'message': 'Failed to send test email. Please verify SMTP credentials.'}), 500
 
 @app.route('/api/admin/stats', methods=['GET'])
 @admin_required

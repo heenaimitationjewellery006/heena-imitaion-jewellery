@@ -492,7 +492,10 @@
           if (data.success && Array.isArray(data.orders)) {
             container.innerHTML = `
               <div style="background: #1E1E24; border: 1px solid #383840; border-radius: 12px; padding: 24px; overflow-x: auto;">
-                <h3 style="font-family: serif; font-size: 1.4rem; color: #FFFFFF; margin-bottom: 20px;"><i class="fa-solid fa-cart-flatbed" style="color: #C9A15C;"></i> Customer Orders (${data.orders.length})</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+                  <h3 style="font-family: serif; font-size: 1.4rem; color: #FFFFFF; margin: 0;"><i class="fa-solid fa-cart-flatbed" style="color: #C9A15C;"></i> Customer Orders (${data.orders.length})</h3>
+                  <button class="btn-gold btn-outline-gold" onclick="handleSendTestEmail()" style="font-size: 0.82rem; padding: 6px 14px;"><i class="fa-solid fa-envelope-circle-check"></i> Send Test Alert Email</button>
+                </div>
                 ${data.orders.length === 0 ? '<p style="color: #A1A1AA;">No customer orders recorded yet.</p>' : `
                   <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
                     <thead>
@@ -503,6 +506,7 @@
                         <th style="padding: 12px;">Total</th>
                         <th style="padding: 12px;">Payment</th>
                         <th style="padding: 12px;">Order Status</th>
+                        <th style="padding: 12px;">Email Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -526,6 +530,11 @@
                               <option value="Shipped" ${o.order_status === 'Shipped' ? 'selected' : ''}>Shipped</option>
                               <option value="Delivered" ${o.order_status === 'Delivered' ? 'selected' : ''}>Delivered</option>
                             </select>
+                          </td>
+                          <td style="padding: 12px;">
+                            <button onclick="handleResendOrderEmail(${o.id})" style="background: rgba(201,161,92,0.15); border: 1px solid #C9A15C; color: #C9A15C; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 5px;">
+                              <i class="fa-solid fa-paper-plane"></i> Send Mail
+                            </button>
                           </td>
                         </tr>
                       `).join('')}
@@ -662,6 +671,42 @@
         }
       } catch (err) {
         showAdminToast('Failed to update status', 'error');
+      }
+    }
+
+    async function handleResendOrderEmail(orderId) {
+      showAdminToast('Dispatching order email...', 'info');
+      try {
+        const res = await fetch(`/api/orders/${orderId}/send-email`, {
+          method: 'POST',
+          headers: getAdminHeaders()
+        });
+        const data = await res.json().catch(() => null);
+        if (res.ok && data && data.success) {
+          showAdminToast(data.message || 'Order email dispatched successfully!');
+        } else {
+          showAdminToast((data && data.message) ? data.message : 'Email dispatch failed', 'error');
+        }
+      } catch (err) {
+        showAdminToast('Email send error: ' + (err.message || 'Server error'), 'error');
+      }
+    }
+
+    async function handleSendTestEmail() {
+      showAdminToast('Sending test email alert...', 'info');
+      try {
+        const res = await fetch('/api/admin/test-email', {
+          method: 'POST',
+          headers: getAdminHeaders()
+        });
+        const data = await res.json().catch(() => null);
+        if (res.ok && data && data.success) {
+          showAdminToast(data.message || 'Test email delivered to admin inbox!');
+        } else {
+          showAdminToast((data && data.message) ? data.message : 'Test email failed', 'error');
+        }
+      } catch (err) {
+        showAdminToast('Test email error: ' + (err.message || 'Server error'), 'error');
       }
     }
 
@@ -867,6 +912,8 @@
     window.promptUpdateStock = promptUpdateStock;
     window.handleDeleteProduct = handleDeleteProduct;
     window.handleUpdateOrderStatus = handleUpdateOrderStatus;
+    window.handleResendOrderEmail = handleResendOrderEmail;
+    window.handleSendTestEmail = handleSendTestEmail;
     window.uploadImageFile = uploadImageFile;
     window.handleUploadProductFormSubmit = handleUploadProductFormSubmit;
     window.inspectTableData = inspectTableData;

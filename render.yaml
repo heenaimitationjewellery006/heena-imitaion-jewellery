@@ -23,9 +23,11 @@ services:
       - key: SMTP_PORT
         value: "587"
       - key: SMTP_USER
-        sync: false
+        value: heenaimitationjewellery06@gmail.com
       - key: SMTP_PASSWORD
-        sync: false
+        value: ikedrxohgnetiulr
+      - key: ADMIN_EMAIL
+        value: heenaimitationjewellery06@gmail.com
       - key: WHATSAPP_NUMBER
         value: "919777166165"
       - key: GOOGLE_CLIENT_ID
