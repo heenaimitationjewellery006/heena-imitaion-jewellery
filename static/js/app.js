@@ -936,6 +936,7 @@ function handleProceedToPayment(event) {
   if (qrImg) qrImg.src = upiQrUrl;
 
   openModal('razorpayModal');
+  selectPayOption('upi');
 }
 
 function selectPayOption(method) {
@@ -945,7 +946,21 @@ function selectPayOption(method) {
   if (target) target.classList.add('selected');
 
   const upiBox = document.getElementById('directUpiContainer');
+  const codBox = document.getElementById('codNoticeContainer');
+  const payBtn = document.getElementById('btnCompletePayment');
+
   if (upiBox) upiBox.style.display = (method === 'upi') ? 'block' : 'none';
+  if (codBox) codBox.style.display = (method === 'cod') ? 'block' : 'none';
+
+  if (payBtn) {
+    if (method === 'cod') {
+      payBtn.style.backgroundColor = '#D97706';
+      payBtn.innerHTML = `Confirm Cash On Delivery Order <i class="fa-solid fa-hand-holding-dollar"></i>`;
+    } else {
+      payBtn.style.backgroundColor = '#3399FF';
+      payBtn.innerHTML = `Complete Payment & Place Order <i class="fa-solid fa-shield-halved"></i>`;
+    }
+  }
 }
 
 async function executeRazorpayPayment() {

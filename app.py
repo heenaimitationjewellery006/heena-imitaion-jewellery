@@ -1465,8 +1465,93 @@ def run_in_app_context(func, *args, **kwargs):
                 print(f"Background task {getattr(func, '__name__', 'func')} note: {e}")
     threading.Thread(target=wrapper).start()
 
+def send_via_https_api(to_email, subject, body_text, body_html):
+    """Sends email over standard HTTPS (Port 443), completely bypassing cloud SMTP port blocks (Render Free Tier)."""
+    # 1. Google Apps Script Web App (Sends directly from Gmail account via Google HTTPS endpoint)
+    script_url = (os.environ.get('GOOGLE_SCRIPT_URL') or os.environ.get('GMAIL_RELAY_URL') or '').strip()
+    if script_url:
+        try:
+            payload = json.dumps({
+                "to": to_email,
+                "subject": subject,
+                "body_text": body_text,
+                "body_html": body_html
+            }).encode('utf-8')
+            req = urllib.request.Request(script_url, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                if resp.status in (200, 201):
+                    print(f"[EMAIL SENT (Google Script HTTPS)] to {to_email}")
+                    return True
+        except Exception as e:
+            print(f"Google Script HTTPS relay notice ({to_email}): {e}")
+
+    # 2. Brevo Transactional Email API (Free 300 emails/day, no custom domain needed)
+    brevo_key = (os.environ.get('BREVO_API_KEY') or '').strip()
+    if brevo_key:
+        try:
+            sender_email = (os.environ.get('BREVO_SENDER_EMAIL') or os.environ.get('ADMIN_EMAIL') or DEFAULT_SMTP_USER).strip()
+            payload = json.dumps({
+                "sender": {"name": "Heena Imitation Jewellery", "email": sender_email},
+                "to": [{"email": to_email}],
+                "subject": subject,
+                "htmlContent": body_html,
+                "textContent": body_text
+            }).encode('utf-8')
+            req = urllib.request.Request(
+                'https://api.brevo.com/v3/smtp/email',
+                data=payload,
+                headers={
+                    'accept': 'application/json',
+                    'api-key': brevo_key,
+                    'content-type': 'application/json'
+                },
+                method='POST'
+            )
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                if resp.status in (200, 201):
+                    print(f"[EMAIL SENT (Brevo HTTPS)] to {to_email}")
+                    return True
+        except Exception as e:
+            print(f"Brevo HTTPS API notice ({to_email}): {e}")
+
+    # 3. Resend Transactional Email API (Free tier)
+    resend_key = (os.environ.get('RESEND_API_KEY') or '').strip()
+    if resend_key:
+        try:
+            from_addr = os.environ.get('RESEND_FROM', 'Heena Imitation Jewellery <onboarding@resend.dev>')
+            payload = json.dumps({
+                "from": from_addr,
+                "to": [to_email],
+                "subject": subject,
+                "html": body_html,
+                "text": body_text
+            }).encode('utf-8')
+            req = urllib.request.Request(
+                'https://api.resend.com/emails',
+                data=payload,
+                headers={
+                    'Authorization': f"Bearer {resend_key}",
+                    'Content-Type': 'application/json'
+                },
+                method='POST'
+            )
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                if resp.status in (200, 201):
+                    print(f"[EMAIL SENT (Resend HTTPS)] to {to_email}")
+                    return True
+        except Exception as e:
+            print(f"Resend HTTPS API notice ({to_email}): {e}")
+
+    return None
+
 def send_smtp_email(to_email, subject, body_text, body_html):
-    """Robust SMTP sender with Dual TLS (587) and SSL (465) fallback and 10s timeout."""
+    """Robust email sender: tries HTTPS APIs first (for cloud compatibility), falling back to SMTP TLS/SSL."""
+    # Step 1: Attempt HTTPS delivery (works reliably across cloud firewalls that block raw SMTP)
+    https_ok = send_via_https_api(to_email, subject, body_text, body_html)
+    if https_ok is True:
+        return True
+
+    # Step 2: Direct SMTP (used locally and on hosting tiers with open SMTP ports)
     smtp_server = (os.environ.get('SMTP_SERVER') or DEFAULT_SMTP_SERVER).strip()
     try:
         smtp_port = int(os.environ.get('SMTP_PORT', DEFAULT_SMTP_PORT))
@@ -1486,9 +1571,9 @@ def send_smtp_email(to_email, subject, body_text, body_html):
     if smtp_user and smtp_pass:
         try:
             if smtp_port == 465:
-                server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10)
+                server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=5)
             else:
-                server = smtplib.SMTP(smtp_server, smtp_port, timeout=10)
+                server = smtplib.SMTP(smtp_server, smtp_port, timeout=5)
                 server.starttls()
             with server:
                 server.login(smtp_user, smtp_pass)
@@ -1497,13 +1582,14 @@ def send_smtp_email(to_email, subject, body_text, body_html):
             return True
         except Exception as e1:
             try:
-                with smtplib.SMTP_SSL(smtp_server, 465, timeout=10) as ssl_server:
+                with smtplib.SMTP_SSL(smtp_server, 465, timeout=5) as ssl_server:
                     ssl_server.login(smtp_user, smtp_pass)
                     ssl_server.sendmail(smtp_user, [to_email], msg.as_string())
                 print(f"[EMAIL SENT (SSL 465)] to {to_email}")
                 return True
             except Exception as e2:
                 print(f"SMTP send failed to {to_email}: {e1} / {e2}")
+                print("[INFO] On Render Free Tier, ports 25, 465, and 587 are blocked by cloud firewall. Configure GOOGLE_SCRIPT_URL or BREVO_API_KEY for HTTPS delivery.")
                 return False
     else:
         print(f"[ERROR: SMTP credentials missing] cannot send to {to_email}")
@@ -2142,12 +2228,14 @@ def create_order():
                 shipping_address, items_json, subtotal, tax, shipping, discount,
                 total, payment_method, payment_status, order_status, created_at
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Placed', %s)
+            RETURNING id
         ''', (
             order_code, customer_name, customer_email, customer_phone,
             shipping_address, json.dumps(items), subtotal, tax, shipping, discount,
             total, payment_method, payment_status, created_at
         ))
-        last_id = cursor.lastrowid
+        row = cursor.fetchone()
+        last_id = row.get('id') if isinstance(row, dict) else (row[0] if row else cursor.lastrowid)
         for item in items:
             cursor.execute("UPDATE products SET stock = GREATEST(0, stock - %s) WHERE id = %s", (item.get('qty', 1), item.get('id')))
     else:

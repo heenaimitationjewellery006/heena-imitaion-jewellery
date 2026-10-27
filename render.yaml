@@ -30,6 +30,12 @@ services:
         value: heenaimitationjewellery06@gmail.com
       - key: WHATSAPP_NUMBER
         value: "919777166165"
+      - key: BACKUP_ADMIN_EMAIL
+        value: mdsaad22410@gmail.com
+      - key: GOOGLE_SCRIPT_URL
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
